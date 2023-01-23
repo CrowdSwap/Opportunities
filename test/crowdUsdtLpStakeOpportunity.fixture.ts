@@ -1,21 +1,18 @@
 import { Fixture } from "ethereum-waffle";
 import {
-  CrowdswapV1,
-  CrowdswapV1__factory,
   CrowdUsdtLpStakeOpportunity__factory,
+  CrowdswapV1Test,
+  CrowdswapV1Test__factory,
   ERC20PresetMinterPauser,
   ERC20PresetMinterPauser__factory,
-  IUniswapV2Pair,
-  IUniswapV2Pair__factory,
+  IUniswapV2PairTest,
+  IUniswapV2PairTest__factory,
   IUniswapV2Router02,
-  IUniswapV3Router,
   StakingLP__factory,
   UniswapV2FactoryTest__factory,
   UniswapV2Router02Test__factory,
-  UniswapV3RouterTest__factory,
-} from "../../artifacts/types";
+} from "../artifacts/types";
 import { ethers, upgrades } from "hardhat";
-import { Dexchanges } from "@crowdswap/constant";
 import { Address } from "ethereumjs-util";
 import { BigNumber, Contract } from "ethers";
 
@@ -45,18 +42,15 @@ const tokenFixture: Fixture<{
 
 export const crowdUsdtLpStakeOpportunityFixture: Fixture<{
   opportunity: Contract;
-  crowdswapV1: CrowdswapV1;
-  uniswapV3: IUniswapV3Router;
+  crowdswapV1: CrowdswapV1Test;
   sushiswap: IUniswapV2Router02;
   quickswap: IUniswapV2Router02;
-  apeswap: IUniswapV2Router02;
-  radioshack: IUniswapV2Router02;
   stakingLP: Contract;
   CROWD: ERC20PresetMinterPauser;
   USDT: ERC20PresetMinterPauser;
   DAI: ERC20PresetMinterPauser;
   MATIC: Address;
-  crowdUsdtPair: IUniswapV2Pair;
+  crowdUsdtPair: IUniswapV2PairTest;
 }> = async ([wallet, revenue], provider) => {
   const signer = provider.getSigner(wallet.address);
 
@@ -68,30 +62,20 @@ export const crowdUsdtLpStakeOpportunityFixture: Fixture<{
     CROWD.address,
     USDT.address
   );
-  const crowdUsdtPair = IUniswapV2Pair__factory.connect(
+  const crowdUsdtPair = IUniswapV2PairTest__factory.connect(
     crowdUsdtPairAddress,
     wallet
   );
 
-  const uniswapV3 = await new UniswapV3RouterTest__factory(signer).deploy();
   const sushiswap = await new UniswapV2Router02Test__factory(signer).deploy(
     factory.address
   );
   const quickswap = await new UniswapV2Router02Test__factory(signer).deploy(
     factory.address
   );
-  const apeswap = await new UniswapV2Router02Test__factory(signer).deploy(
-    factory.address
-  );
-  const radioshack = await new UniswapV2Router02Test__factory(signer).deploy(
-    factory.address
-  );
-  const crowdswapV1 = await new CrowdswapV1__factory(signer).deploy([
-    { flag: Dexchanges.UniswapV3.code, adr: uniswapV3.address },
-    { flag: Dexchanges.Sushiswap.code, adr: sushiswap.address },
-    { flag: Dexchanges.Quickswap.code, adr: quickswap.address },
-    { flag: Dexchanges.Apeswap.code, adr: apeswap.address },
-    { flag: Dexchanges.Radioshack.code, adr: radioshack.address },
+  const crowdswapV1 = await new CrowdswapV1Test__factory(signer).deploy([
+    { flag: 0x03, adr: sushiswap.address },
+    { flag: 0x08, adr: quickswap.address },
   ]);
 
   let currentTimestamp = await ethers.provider.getBlock("latest");
@@ -140,11 +124,8 @@ export const crowdUsdtLpStakeOpportunityFixture: Fixture<{
   return {
     opportunity,
     crowdswapV1,
-    uniswapV3,
     sushiswap,
     quickswap,
-    apeswap,
-    radioshack,
     stakingLP,
     CROWD,
     USDT,

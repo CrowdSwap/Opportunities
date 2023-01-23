@@ -1,8 +1,7 @@
 import { ethers, waffle } from "hardhat";
 import { expect } from "chai";
-import { beefyMimaticUsdcOpportunityFixture } from "../shared/beefyMimaticUsdcOpportunity.fixture";
-import { Dexchanges } from "@crowdswap/constant";
-import { UniswapV2Router02Test } from "../../artifacts/types";
+import { beefyMimaticUsdcOpportunityFixture } from "./beefyMimaticUsdcOpportunity.fixture";
+import { UniswapV2Router02Test } from "../artifacts/types";
 import { BigNumber } from "ethers";
 import { AddressZero } from "@ethersproject/constants";
 
@@ -1726,7 +1725,7 @@ describe("BeefyMimaticUsdcOpportunity", async () => {
       toToken.address,
       opportunity.address,
       amountIn,
-      Dexchanges[dexName].code,
+      getDexFlag(dexName),
       swapTx_onDex.data
     );
   }
@@ -1752,8 +1751,16 @@ describe("BeefyMimaticUsdcOpportunity", async () => {
       toToken.address,
       opportunity.address,
       amountIn,
-      Dexchanges[dexName].code,
+      getDexFlag(dexName),
       swapTx_onDex.data
     );
+  }
+
+  function getDexFlag(dexName: string) {
+    if (dexName == "Sushiswap") {
+      return 0x03;
+    } else if (dexName == "Quickswap") {
+      return 0x08;
+    }
   }
 });

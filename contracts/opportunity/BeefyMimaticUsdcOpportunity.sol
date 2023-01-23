@@ -23,6 +23,8 @@ contract BeefyMimaticUsdcOpportunity is Opportunity {
     IUniswapV2Router02 public router;
     IBeefyVault public vault;
 
+    event SetVault(address indexed user, address vault);
+
     /**
      * @dev The contract constructor
      * @param _tokenMimatic The address of the MIM token
@@ -70,16 +72,19 @@ contract BeefyMimaticUsdcOpportunity is Opportunity {
     function setSwapContract(address _address) external onlyOwner {
         require(_address != address(0), "oe12");
         swapContract = _address;
+        emit SetSwapContact(msg.sender, _address);
     }
 
     function setRouter(address _address) external onlyOwner {
         require(_address != address(0), "oe12");
         router = IUniswapV2Router02(_address);
+        emit SetRouter(msg.sender, _address);
     }
 
     function setVault(address _address) external onlyOwner {
         require(_address != address(0), "oe12");
         vault = IBeefyVault(_address);
+        emit SetVault(msg.sender, _address);
     }
 
     function swap(

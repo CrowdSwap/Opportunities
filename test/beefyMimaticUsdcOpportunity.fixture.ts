@@ -1,22 +1,19 @@
 import { Fixture } from "ethereum-waffle";
 import {
   BeefyMimaticUsdcOpportunity__factory,
-  CrowdswapV1,
-  CrowdswapV1__factory,
+  CrowdswapV1Test,
+  CrowdswapV1Test__factory,
   ERC20PresetMinterPauser,
   ERC20PresetMinterPauser__factory,
   UniswapV2Router02Test__factory,
   IUniswapV2Router02,
   BeefyVaultV6Test__factory,
-  IUniswapV3Router,
-  UniswapV3RouterTest__factory,
   UniswapV2FactoryTest__factory,
-  IUniswapV2Pair,
-  IUniswapV2Pair__factory,
+  IUniswapV2PairTest,
+  IUniswapV2PairTest__factory,
   BeefyVaultV6Test,
-} from "../../artifacts/types";
+} from "../artifacts/types";
 import { ethers, upgrades } from "hardhat";
-import { Dexchanges } from "@crowdswap/constant";
 import { Address } from "ethereumjs-util";
 import { Contract } from "ethers";
 
@@ -46,17 +43,14 @@ const tokenFixture: Fixture<{
 
 export const beefyMimaticUsdcOpportunityFixture: Fixture<{
   opportunity: Contract;
-  crowdswapV1: CrowdswapV1;
-  uniswapV3: IUniswapV3Router;
+  crowdswapV1: CrowdswapV1Test;
   sushiswap: IUniswapV2Router02;
   quickswap: IUniswapV2Router02;
-  apeswap: IUniswapV2Router02;
-  radioshack: IUniswapV2Router02;
   MIMATIC: ERC20PresetMinterPauser;
   USDC: ERC20PresetMinterPauser;
   DAI: ERC20PresetMinterPauser;
   MATIC: Address;
-  mimaticUsdcPair: IUniswapV2Pair;
+  mimaticUsdcPair: IUniswapV2PairTest;
   mimaticUsdcVault: BeefyVaultV6Test;
 }> = async ([wallet, revenue], provider) => {
   const signer = provider.getSigner(wallet.address);
@@ -69,30 +63,20 @@ export const beefyMimaticUsdcOpportunityFixture: Fixture<{
     MIMATIC.address,
     USDC.address
   );
-  const mimaticUsdcPair = IUniswapV2Pair__factory.connect(
+  const mimaticUsdcPair = IUniswapV2PairTest__factory.connect(
     mimaticUsdcPairAddress,
     wallet
   );
 
-  const uniswapV3 = await new UniswapV3RouterTest__factory(signer).deploy();
   const sushiswap = await new UniswapV2Router02Test__factory(signer).deploy(
     factory.address
   );
   const quickswap = await new UniswapV2Router02Test__factory(signer).deploy(
     factory.address
   );
-  const apeswap = await new UniswapV2Router02Test__factory(signer).deploy(
-    factory.address
-  );
-  const radioshack = await new UniswapV2Router02Test__factory(signer).deploy(
-    factory.address
-  );
-  const crowdswapV1 = await new CrowdswapV1__factory(signer).deploy([
-    { flag: Dexchanges.UniswapV3.code, adr: uniswapV3.address },
-    { flag: Dexchanges.Sushiswap.code, adr: sushiswap.address },
-    { flag: Dexchanges.Quickswap.code, adr: quickswap.address },
-    { flag: Dexchanges.Apeswap.code, adr: apeswap.address },
-    { flag: Dexchanges.Radioshack.code, adr: radioshack.address },
+  const crowdswapV1 = await new CrowdswapV1Test__factory(signer).deploy([
+    { flag: 0x03, adr: sushiswap.address },
+    { flag: 0x08, adr: quickswap.address },
   ]);
 
   const mimaticUsdcVault = await new BeefyVaultV6Test__factory(signer).deploy(
@@ -104,7 +88,7 @@ export const beefyMimaticUsdcOpportunityFixture: Fixture<{
   const fee = ethers.utils.parseEther("0.1");
 
   const beefyMimaticUsdcOpportunityFactory =
-    await new BeefyMimaticUsdcOpportunity__factory(signer);
+    new BeefyMimaticUsdcOpportunity__factory(signer);
   const opportunity = await upgrades.deployProxy(
     beefyMimaticUsdcOpportunityFactory,
     [
@@ -128,11 +112,8 @@ export const beefyMimaticUsdcOpportunityFixture: Fixture<{
   return {
     opportunity,
     crowdswapV1,
-    uniswapV3,
     sushiswap,
     quickswap,
-    apeswap,
-    radioshack,
     MIMATIC,
     USDC,
     DAI,
