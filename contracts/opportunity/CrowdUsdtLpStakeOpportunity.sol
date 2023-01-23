@@ -21,6 +21,8 @@ contract CrowdUsdtLpStakeOpportunity is Opportunity {
     IUniswapV2Router02 public router;
     IStakingLP public stakingLP;
 
+    event SetStakingLP(address indexed user, address stakeContract);
+
     /**
      * @dev The contract constructor
      * @param _tokenCrowd The address of the CROWD token
@@ -68,16 +70,19 @@ contract CrowdUsdtLpStakeOpportunity is Opportunity {
     function setSwapContract(address _address) external onlyOwner {
         require(_address != address(0), "oe12");
         swapContract = _address;
+        emit SetSwapContact(msg.sender, _address);
     }
 
     function setRouter(address _address) external onlyOwner {
         require(_address != address(0), "oe12");
         router = IUniswapV2Router02(_address);
+        emit SetRouter(msg.sender, _address);
     }
 
     function setStakingLP(address _address) external onlyOwner {
         require(_address != address(0), "oe12");
         stakingLP = IStakingLP(_address);
+        emit SetStakingLP(msg.sender, _address);
     }
 
     function swap(

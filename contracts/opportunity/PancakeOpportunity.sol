@@ -49,6 +49,10 @@ contract PancakeOpportunity is Opportunity, ReentrancyGuardUpgradeable {
 
     IERC20Upgradeable public rewardToken;
 
+    event SetMasterChef(address indexed user, address masterChefContract);
+    event SetPId(address indexed user, uint256 pid);
+    event SetRewardToken(address indexed user, address rewardToken);
+
     /**
      * @dev The contract constructor
      * @param _tokenA The address of the A token
@@ -109,25 +113,30 @@ contract PancakeOpportunity is Opportunity, ReentrancyGuardUpgradeable {
     function setSwapContract(address _address) external onlyOwner {
         require(_address != address(0), "oe12");
         swapContract = _address;
+        emit SetSwapContact(msg.sender, _address);
     }
 
     function setRouter(address _address) external onlyOwner {
         require(_address != address(0), "oe12");
         router = IUniswapV2Router02(_address);
+        emit SetRouter(msg.sender, _address);
     }
 
     function setMasterChefV2(address _address) external onlyOwner {
         require(_address != address(0), "oe12");
         pancakeMasterChefV2 = IPancakeMasterChefV2(_address);
+        emit SetMasterChef(msg.sender, _address);
     }
 
     function setPId(uint256 _pId) external onlyOwner {
         pId = _pId;
+        emit SetPId(msg.sender, _pId);
     }
 
     function setRewardToken(address _rewardToken) external onlyOwner {
         require(_rewardToken != address(0), "oe12");
         rewardToken = IERC20Upgradeable(_rewardToken);
+        emit SetRewardToken(msg.sender, _rewardToken);
     }
 
     function getUserInfo(address _userAddress)
@@ -144,7 +153,7 @@ contract PancakeOpportunity is Opportunity, ReentrancyGuardUpgradeable {
             address(this)
         );
 
-        (uint256 amount, , ) = _pancakeMasterChefV2.userInfo(
+        (uint256 amount,,) = _pancakeMasterChefV2.userInfo(
             pId,
             address(this)
         );

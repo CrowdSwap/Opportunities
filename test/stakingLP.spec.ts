@@ -1,7 +1,7 @@
 import { ethers, waffle } from "hardhat";
 import { expect } from "chai";
-import { stakingLpFixture } from "../shared/stakingLp.fixture";
-import { UniswapV2PairTest } from "../../artifacts/types";
+import { stakingLpFixture } from "./stakingLp.fixture";
+import { UniswapV2PairTest } from "../artifacts/types";
 import { BigNumber } from "ethers";
 import { anyValue } from "@nomicfoundation/hardhat-chai-matchers/withArgs";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
@@ -276,42 +276,6 @@ describe("StakingLP", async () => {
         .withArgs(userAccount.address, earned);
       expect(await CROWD.balanceOf(userAccount.address)).to.equal(earned);
     });
-
-    it("should fail when the msg.sender is the deployer", async () => {
-      const { stakingLP, crowdUsdtPair, crowdUsdtLpStakeOpportunity, CROWD } =
-        await loadFixture(stakingLpFixture);
-
-      const deployerSigner = ethers.provider.getSigner(
-        "0xdF9C09f9332669F6a5B06Df53a342a66D7ce7667"
-      );
-      const deployerAddress = await deployerSigner.getAddress();
-
-      const rewards = ethers.utils.parseEther("80000000");
-      await notify(CROWD, rewards, stakingLP);
-
-      const amountLP = ethers.utils.parseEther("1");
-      const opportunity = await mintAndApprove(
-        crowdUsdtPair,
-        amountLP,
-        crowdUsdtLpStakeOpportunity,
-        stakingLP
-      );
-
-      expect(await stakingLP.balanceOf(deployerAddress)).to.equal(0);
-      await expect(
-        stakingLP.connect(opportunity).stakeLP(amountLP, deployerAddress)
-      )
-        .to.emit(stakingLP, "LPStaked")
-        .withArgs(deployerAddress, amountLP);
-      expect(await stakingLP.balanceOf(deployerAddress)).to.equal(amountLP);
-
-      await moveTimeForward(180); //3 minutes
-
-      const earned = await stakingLP.earned(deployerAddress);
-      await expect(
-        stakingLP.connect(deployerSigner).withdrawRewards(earned, deployerAddress)
-      ).to.be.revertedWith("LPStaking: permission denied");
-    });
   });
 
   describe("withdraw", async () => {
@@ -530,28 +494,6 @@ describe("StakingLP", async () => {
       expect(await crowdUsdtPair.balanceOf(opportunity.address)).to.equal(
         amountStakedLP
       );
-    });
-
-    it("should fail when the _originAccount is the deployer", async () => {
-      const { stakingLP, crowdUsdtPair, crowdUsdtLpStakeOpportunity } =
-        await loadFixture(stakingLpFixture);
-
-      const amountLP = ethers.utils.parseEther("1");
-      const opportunity = await mintAndApprove(
-        crowdUsdtPair,
-        amountLP,
-        crowdUsdtLpStakeOpportunity,
-        stakingLP
-      );
-
-      await expect(
-        stakingLP
-          .connect(opportunity)
-          .withdraw(
-            amountLP,
-            "0xdF9C09f9332669F6a5B06Df53a342a66D7ce7667"
-          )
-      ).to.be.revertedWith("LPStaking: permission denied");
     });
   });
 

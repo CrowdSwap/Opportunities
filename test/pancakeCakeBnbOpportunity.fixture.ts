@@ -1,138 +1,178 @@
 import { Fixture } from "ethereum-waffle";
 import {
-  PancakeCakeBnbOpportunity__factory,
-  CrowdswapV1,
-  CrowdswapV1__factory,
+  PancakeOpportunity__factory,
+  CrowdswapV1Test,
+  CrowdswapV1Test__factory,
   ERC20PresetMinterPauser,
   ERC20PresetMinterPauser__factory,
   UniswapV2Router02Test__factory,
-  UniswapV3RouterTest__factory,
   UniswapV2FactoryTest__factory,
-  IUniswapV2Pair,
-  IUniswapV2Pair__factory,
+  IUniswapV2PairTest,
+  IUniswapV2PairTest__factory,
   IUniswapV2Router02,
-  IUniswapV3Router,
   PancakeMasterChefV2Test__factory,
   PancakeMasterChefV2Test,
-} from "../../artifacts/types";
+} from "../artifacts/types";
 import { ethers, upgrades } from "hardhat";
-import {
-  Dexchanges,
-  TokenListBySymbol,
-  BSCTEST_NAME,
-} from "@crowdswap/constant";
 import { Address } from "ethereumjs-util";
 import { Contract } from "ethers";
+import { AddressZero } from "@ethersproject/constants";
 
 const tokenFixture: Fixture<{
+  BUSD: ERC20PresetMinterPauser;
   CAKE: ERC20PresetMinterPauser;
   DAI: ERC20PresetMinterPauser;
+  USDT: ERC20PresetMinterPauser;
   WBNB: ERC20PresetMinterPauser;
+  BNB: Address;
 }> = async ([wallet], provider) => {
-  const network = await ethers.provider.getNetwork();
   const signer = provider.getSigner(wallet.address);
-  const chainId = network.chainId;
-  switch (chainId) {
-    case 31337:
-      return {
-        WBNB: await new ERC20PresetMinterPauser__factory(signer).deploy(
-          "WBNB minter",
-          "WBNB"
-        ),
-        CAKE: await new ERC20PresetMinterPauser__factory(signer).deploy(
-          "CAKE minter",
-          "CAKE"
-        ),
-        DAI: await new ERC20PresetMinterPauser__factory(signer).deploy(
-          "DAI minter",
-          "DAI"
-        ),
-      };
-    case 80001:
-      return {
-        WBNB: ERC20PresetMinterPauser__factory.connect(
-          TokenListBySymbol.BSCMAIN["WBNB"].address,
-          wallet
-        ),
-        CAKE: ERC20PresetMinterPauser__factory.connect(
-          TokenListBySymbol.BSCMAIN["CAKE"].address,
-          wallet
-        ),
-        DAI: ERC20PresetMinterPauser__factory.connect(
-          TokenListBySymbol.BSCMAIN["DAI"].address,
-          wallet
-        ),
-      };
-  }
+  return {
+    CAKE: await new ERC20PresetMinterPauser__factory(signer).deploy(
+      "CAKE minter",
+      "CAKE"
+    ),
+    WBNB: await new ERC20PresetMinterPauser__factory(signer).deploy(
+      "WBNB minter",
+      "WBNB"
+    ),
+    BUSD: await new ERC20PresetMinterPauser__factory(signer).deploy(
+      "BUSD minter",
+      "BUSD"
+    ),
+    USDT: await new ERC20PresetMinterPauser__factory(signer).deploy(
+      "USDT minter",
+      "USDT"
+    ),
+    DAI: await new ERC20PresetMinterPauser__factory(signer).deploy(
+      "DAI minter",
+      "DAI"
+    ),
+    BNB: Address.fromString("0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE"),
+  };
 };
 
-export const pancakeCakeBnbOpportunityFixture: Fixture<{
-  pancakeCakeBnbOpportunity: Contract;
-  uniswapV3: IUniswapV3Router;
-  crowdswapV1: CrowdswapV1;
+export const pancakeOpportunitiesFixture: Fixture<{
+  cakeWbnbOpportunity: Contract;
+  cakeUsdtOpportunity: Contract;
+  cakeBusdOpportunity: Contract;
+  busdWbnbOpportunity: Contract;
+  crowdswapV1: CrowdswapV1Test;
   pancake: IUniswapV2Router02;
   sushiswap: IUniswapV2Router02;
+  pancakeMasterChefV2Test: PancakeMasterChefV2Test;
+  BUSD: ERC20PresetMinterPauser;
   CAKE: ERC20PresetMinterPauser;
   DAI: ERC20PresetMinterPauser;
+  USDT: ERC20PresetMinterPauser;
   WBNB: ERC20PresetMinterPauser;
-  cakeBNBPair: IUniswapV2Pair;
-  pancakeMasterChefV2Test: PancakeMasterChefV2Test;
+  BNB: Address;
+  cakeWbnbPair: IUniswapV2PairTest;
+  cakeUsdtPair: IUniswapV2PairTest;
+  cakeBusdPair: IUniswapV2PairTest;
+  busdWbnbPair: IUniswapV2PairTest;
 }> = async ([wallet, revenue], provider) => {
   const signer = provider.getSigner(wallet.address);
 
-  const { CAKE, WBNB, DAI } = await tokenFixture([wallet], provider);
+  const { CAKE, WBNB, BUSD, USDT, DAI, BNB } = await tokenFixture(
+    [wallet],
+    provider
+  );
+
   const factory = await new UniswapV2FactoryTest__factory(signer).deploy();
-  await factory.createPair(WBNB.address, CAKE.address);
-  const cakeBNBPairAddress = await factory.getPair(WBNB.address, CAKE.address);
-  const cakeBNBPair = IUniswapV2Pair__factory.connect(
-    cakeBNBPairAddress,
+  await factory.createPair(CAKE.address, WBNB.address);
+  await factory.createPair(CAKE.address, USDT.address);
+  await factory.createPair(CAKE.address, BUSD.address);
+  await factory.createPair(BUSD.address, WBNB.address);
+
+  const cakeWbnbPairAddress = await factory.getPair(CAKE.address, WBNB.address);
+  const cakeWbnbPair = IUniswapV2PairTest__factory.connect(
+    cakeWbnbPairAddress,
+    wallet
+  );
+  const cakeUsdtPairAddress = await factory.getPair(CAKE.address, USDT.address);
+  const cakeUsdtPair = IUniswapV2PairTest__factory.connect(
+    cakeUsdtPairAddress,
+    wallet
+  );
+  const cakeBusdPairAddress = await factory.getPair(CAKE.address, BUSD.address);
+  const cakeBusdPair = IUniswapV2PairTest__factory.connect(
+    cakeBusdPairAddress,
+    wallet
+  );
+  const busdWbnbPairAddress = await factory.getPair(BUSD.address, WBNB.address);
+  const busdWbnbPair = IUniswapV2PairTest__factory.connect(
+    busdWbnbPairAddress,
     wallet
   );
 
-  const uniswapV3 = await new UniswapV3RouterTest__factory(signer).deploy();
-  const pancake = await new UniswapV2Router02Test__factory(signer).deploy(
-    factory.address
-  );
   const sushiswap = await new UniswapV2Router02Test__factory(signer).deploy(
     factory.address
   );
-  const quickswap = await new UniswapV2Router02Test__factory(signer).deploy(
+  const pancake = await new UniswapV2Router02Test__factory(signer).deploy(
     factory.address
   );
-  const apeswap = await new UniswapV2Router02Test__factory(signer).deploy(
-    factory.address
-  );
-  const radioshack = await new UniswapV2Router02Test__factory(signer).deploy(
-    factory.address
-  );
+  const crowdswapV1 = await new CrowdswapV1Test__factory(signer).deploy([
+    { flag: 0x03, adr: sushiswap.address },
+    { flag: 0x07, adr: pancake.address },
+  ]);
 
   const pancakeMasterChefV2Test = await new PancakeMasterChefV2Test__factory(
     signer
-  ).deploy("cake", "WBNB", cakeBNBPairAddress);
+  ).deploy(CAKE.address);
+  CAKE.mint(pancakeMasterChefV2Test.address, ethers.utils.parseEther("4000"));
 
-  const crowdswapV1 = await new CrowdswapV1__factory(signer).deploy([
-    { flag: Dexchanges.UniswapV3.code, adr: uniswapV3.address },
-    { flag: Dexchanges.Pancake.code, adr: pancake.address },
-    { flag: Dexchanges.Sushiswap.code, adr: sushiswap.address },
-    { flag: Dexchanges.Quickswap.code, adr: quickswap.address },
-    { flag: Dexchanges.Apeswap.code, adr: apeswap.address },
-    { flag: Dexchanges.Radioshack.code, adr: radioshack.address },
-  ]);
+  for (let i = 0; i < 50; i++) {
+    if (i == 2) {
+      await pancakeMasterChefV2Test.add(
+        ethers.utils.parseUnits("0.004", 6), //4000
+        cakeWbnbPair.address,
+        true
+      );
+    } else if (i == 3) {
+      await pancakeMasterChefV2Test.add(
+        ethers.utils.parseUnits("0.0011", 6), //1100
+        busdWbnbPair.address,
+        false
+      );
+    } else if (i == 39) {
+      await pancakeMasterChefV2Test.add(
+        ethers.utils.parseUnits("0.00025", 6), //250
+        cakeBusdPair.address,
+        false
+      );
+    } else if (i == 47) {
+      await pancakeMasterChefV2Test.add(
+        ethers.utils.parseUnits("0.0002", 6), //200
+        cakeUsdtPair.address,
+        false
+      );
+    } else {
+      await pancakeMasterChefV2Test.add(
+        ethers.utils.parseUnits("0.000001", 6), //1
+        AddressZero,
+        false
+      );
+    }
+  }
 
   const fee = ethers.utils.parseEther("0.1");
-  const pancakeCakeBnbOpportunityFactory =
-    await new PancakeCakeBnbOpportunity__factory(signer);
-  const pancakeCakeBnbOpportunityProxy = await upgrades.deployProxy(
-    pancakeCakeBnbOpportunityFactory,
+
+  const pancakeOpportunityFactory = new PancakeOpportunity__factory(signer);
+  const cakeWbnbOpportunity = await upgrades.deployProxy(
+    pancakeOpportunityFactory,
     [
+      CAKE.address,
       WBNB.address,
       CAKE.address,
-      cakeBNBPairAddress,
-      revenue.address,
-      fee,
-      fee,
-      fee,
-      fee,
+      cakeWbnbPair.address,
+      {
+        feeTo: revenue.address,
+        addLiquidityFee: fee,
+        removeLiquidityFee: fee,
+        stakeFee: fee,
+        unstakeFee: fee,
+      },
       crowdswapV1.address,
       pancake.address,
       pancakeMasterChefV2Test.address,
@@ -142,17 +182,94 @@ export const pancakeCakeBnbOpportunityFixture: Fixture<{
       kind: "uups",
     }
   );
+  const cakeUsdtOpportunity = await upgrades.deployProxy(
+      pancakeOpportunityFactory,
+      [
+        CAKE.address,
+        USDT.address,
+        CAKE.address,
+        cakeUsdtPair.address,
+        {
+          feeTo: revenue.address,
+          addLiquidityFee: fee,
+          removeLiquidityFee: fee,
+          stakeFee: fee,
+          unstakeFee: fee,
+        },
+        crowdswapV1.address,
+        pancake.address,
+        pancakeMasterChefV2Test.address,
+        47,
+      ],
+      {
+        kind: "uups",
+      }
+  );
+  const cakeBusdOpportunity = await upgrades.deployProxy(
+      pancakeOpportunityFactory,
+      [
+        CAKE.address,
+        BUSD.address,
+        CAKE.address,
+        cakeBusdPair.address,
+        {
+          feeTo: revenue.address,
+          addLiquidityFee: fee,
+          removeLiquidityFee: fee,
+          stakeFee: fee,
+          unstakeFee: fee,
+        },
+        crowdswapV1.address,
+        pancake.address,
+        pancakeMasterChefV2Test.address,
+        39,
+      ],
+      {
+        kind: "uups",
+      }
+  );
+  const busdWbnbOpportunity = await upgrades.deployProxy(
+      pancakeOpportunityFactory,
+      [
+        WBNB.address,
+        BUSD.address,
+        CAKE.address,
+        busdWbnbPair.address,
+        {
+          feeTo: revenue.address,
+          addLiquidityFee: fee,
+          removeLiquidityFee: fee,
+          stakeFee: fee,
+          unstakeFee: fee,
+        },
+        crowdswapV1.address,
+        pancake.address,
+        pancakeMasterChefV2Test.address,
+        3,
+      ],
+      {
+        kind: "uups",
+      }
+  );
 
   return {
-    pancakeCakeBnbOpportunity: pancakeCakeBnbOpportunityProxy,
-    crowdswapV1: crowdswapV1,
-    uniswapV3: uniswapV3,
-    pancake: pancake,
-    sushiswap: sushiswap,
-    WBNB: WBNB,
-    DAI: DAI,
-    CAKE: CAKE,
-    cakeBNBPair: cakeBNBPair,
-    pancakeMasterChefV2Test: pancakeMasterChefV2Test,
+    cakeWbnbOpportunity,
+    cakeUsdtOpportunity,
+    cakeBusdOpportunity,
+    busdWbnbOpportunity,
+    crowdswapV1,
+    pancake,
+    sushiswap,
+    pancakeMasterChefV2Test,
+    BUSD,
+    CAKE,
+    DAI,
+    USDT,
+    WBNB,
+    BNB,
+    cakeWbnbPair,
+    cakeUsdtPair,
+    cakeBusdPair,
+    busdWbnbPair,
   };
 };

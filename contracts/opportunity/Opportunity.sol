@@ -73,6 +73,13 @@ abstract contract Opportunity is Initializable, UUPSUpgradeable, PausableUpgrade
     event FeeDeducted(address indexed user, address token, uint256 amount, uint256 totalFee);
     event WithdrawnFunds(address token, uint256 amount, address receiver);
 
+    event SetSwapContact(address indexed user, address swapContract);
+    event SetRouter(address indexed user, address router);
+    event SetFee(address indexed user, uint256 feePercentage);
+    event SetFeeTo(address indexed user, address feeTo);
+    event SetToken(address indexed user, address token);
+    event SetPair(address indexed user, address pair);
+
     /**
      * @dev tokenA and tokenB are received
      * @param _userAddress The address of the user
@@ -241,41 +248,45 @@ abstract contract Opportunity is Initializable, UUPSUpgradeable, PausableUpgrade
     function setFeeTo(address payable _feeTo) external onlyOwner {
         require(_feeTo != address(0), "oe12");
         feeTo = _feeTo;
+        emit SetFeeTo(msg.sender, _feeTo);
     }
 
     function setAddLiquidityFee(uint256 _feePercentage) external onlyOwner {
-        require(_feePercentage >= 0, "oe11");
         addLiquidityFee = _feePercentage;
+        emit SetFee(msg.sender, _feePercentage);
     }
 
     function setRemoveLiquidityFee(uint256 _feePercentage) external onlyOwner {
-        require(_feePercentage >= 0, "oe11");
         removeLiquidityFee = _feePercentage;
+        emit SetFee(msg.sender, _feePercentage);
     }
 
     function setStakeFee(uint256 _feePercentage) external onlyOwner {
-        require(_feePercentage >= 0, "oe11");
         stakeFee = _feePercentage;
+        emit SetFee(msg.sender, _feePercentage);
     }
 
     function setUnstakeFee(uint256 _feePercentage) external onlyOwner {
-        require(_feePercentage >= 0, "oe11");
         unstakeFee = _feePercentage;
+        emit SetFee(msg.sender, _feePercentage);
     }
 
     function setTokenA(address _tokenA) external onlyOwner {
         require(_tokenA != address(0), "oe12");
         tokenA = IERC20Upgradeable(_tokenA);
+        emit SetToken(msg.sender, _tokenA);
     }
 
     function setTokenB(address _tokenB) external onlyOwner {
         require(_tokenB != address(0), "oe12");
         tokenB = IERC20Upgradeable(_tokenB);
+        emit SetToken(msg.sender, _tokenB);
     }
 
     function setPair(address _pair) external onlyOwner {
         require(_pair != address(0), "oe12");
         pair = IERC20Upgradeable(_pair);
+        emit SetPair(msg.sender, _pair);
     }
 
     function withdrawFunds(
