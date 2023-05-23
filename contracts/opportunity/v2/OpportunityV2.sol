@@ -1,10 +1,13 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.10;
 
-import "../helpers/OwnableUpgradeable.sol";
-import "../libraries/UniERC20Upgradeable.sol";
-import "../interfaces/IWETH.sol";
-import "../interfaces/IUniswapV2Factory.sol";
+import "../../helpers/OwnableUpgradeable.sol";
+import "../../libraries/UniERC20Upgradeable.sol";
+import "../../libraries/Math.sol";
+import "../../interfaces/IWETH.sol";
+import "../../interfaces/ICrowdswapAggregator.sol";
+import "../../interfaces/IUniswapV2Pair.sol";
+import "../../interfaces/IUniswapV2Factory.sol";
 
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
@@ -12,7 +15,7 @@ import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 
-abstract contract Opportunity is
+abstract contract OpportunityV2 is
     Initializable,
     UUPSUpgradeable,
     PausableUpgradeable,
@@ -53,25 +56,52 @@ abstract contract Opportunity is
         address payable receiverAccount;
     }
 
+    struct DexDescriptor {
+        bytes4 selector;
+        bytes[] params;
+        bool isReplace;
+        uint8 index;
+        uint16 flag;
+    }
+
+    /**
+     * @dev A struct containing parameters needed to calculate fees
+     * @member feeTo The address of recipient of the fees
+     * @member addLiquidityFee The initial fee of Add Liquidity step
+     * @member removeLiquidityFee The initial fee of Remove Liquidity step
+     * @member stakeFee The initial fee of Stake step
+     * @member unstakeFee The initial fee of Unstake step
+     */
+    struct FeeStruct {
+        address payable feeTo;
+        uint256 addLiquidityFee;
+        uint256 removeLiquidityFee;
+        uint256 stakeFee;
+        uint256 unstakeFee;
+        uint256 dexFee;
+        uint256 aggregatorFee;
+    }
+
     struct Balances {
         uint256 rewardToken;
         uint256 tokenA;
         uint256 tokenB;
     }
 
-    uint256 public addLiquidityFee;
-    uint256 public removeLiquidityFee;
-    uint256 public stakeFee;
-    uint256 public unstakeFee;
-
-    address payable public feeTo;
+    FeeStruct public feeStruct;
 
     IERC20Upgradeable public tokenA;
     IERC20Upgradeable public tokenB;
     IWETH public coinWrapper;
     IERC20Upgradeable public pair;
-
     address public pairFactoryContract;
+
+    /**
+     * @dev This empty reserved space is put in place to allow future versions to add new
+     * variables without shifting down storage in the inheritance chain.
+     * See https://docs.openzeppelin.com/contracts/4.x/upgradeable#storage_gaps
+     */
+    uint256[50] private __gap;
 
     event Swapped(
         address indexed user,
@@ -164,113 +194,195 @@ abstract contract Opportunity is
     /**
      * @dev tokenA and tokenB are received
      * @param _userAddress The address of the user
-     * @param _token The address of the token on which the quote is based
-     * @param _addLiqDescriptor Parameters needed to add liquidity
+     * @param _amountA The recieved amount of token A
+     * @param _amountB  The recieved amount of token B
+     * @param _addLiquidityDeadline Unix timestamp after which the addLiquidity will revert
      */
     function investByTokenATokenB(
         address _userAddress,
-        IERC20Upgradeable _token,
-        AddLiqDescriptor memory _addLiqDescriptor
+        uint256 _amountA,
+        uint256 _amountB,
+        uint256 _addLiquidityDeadline
     ) external payable whenNotPaused refund(_userAddress) {
         IERC20Upgradeable _tokenA = tokenA; // gas savings
         IERC20Upgradeable _tokenB = tokenB; // gas savings
-        require(_token == _tokenA || _token == _tokenB, "oe04");
+        FeeStruct memory _feeStruct = feeStruct; // gas savings
 
         // Allow investment by coin
         if (msg.value > 0 && address(coinWrapper) != address(0)) {
             coinWrapper.deposit{value: msg.value}();
             address(_tokenA) == address(coinWrapper)
-                ? _transferFrom(_tokenB, _addLiqDescriptor.amountBDesired)
+                ? _transferFrom(_tokenB, _amountB)
                 : address(_tokenB) == address(coinWrapper)
-                ? _transferFrom(_tokenA, _addLiqDescriptor.amountADesired)
+                ? _transferFrom(_tokenA, _amountA)
                 : revert("The opportunity does not include wrapper token");
         } else {
-            _transferFrom(_tokenA, _addLiqDescriptor.amountADesired);
-            _transferFrom(_tokenB, _addLiqDescriptor.amountBDesired);
+            _transferFrom(_tokenA, _amountA);
+            _transferFrom(_tokenB, _amountB);
         }
 
         emit InvestedByTokenATokenB(
             _userAddress,
-            address(_token),
-            _addLiqDescriptor.amountADesired,
-            _addLiqDescriptor.amountBDesired
+            address(_tokenB),
+            _amountA,
+            _amountB
         );
 
         uint256 _totalFee = _deductFee(
-            addLiquidityFee + addLiquidityFee + stakeFee + stakeFee,
-            _token,
-            _token == _tokenA
-                ? _addLiqDescriptor.amountADesired
-                : _addLiqDescriptor.amountBDesired
+            2 * (_feeStruct.addLiquidityFee + _feeStruct.stakeFee),
+            _tokenB,
+            _amountB
         );
-        _token == _tokenA
-            ? _addLiqDescriptor.amountADesired -= _totalFee
-            : _addLiqDescriptor.amountBDesired -= _totalFee;
 
+        _amountB -= _totalFee;
+        AddLiqDescriptor memory _addLiqDescriptor = _getAddLiquidityParameters(
+            _amountA,
+            _amountB,
+            _addLiquidityDeadline
+        );
         uint256 _liquidity = _addLiquidity(_addLiqDescriptor);
         _stake(_userAddress, _liquidity);
     }
 
     /**
-     * @dev TokenA or TokenB is received
+     * @dev Only token A is received
      * @param _userAddress The address of the user
-     * @param _token The address of the fromToken in the swap transaction
-     * @param _amount The total amount of _token to be swapped to tokenA or tokenB and to add liquidity
-     * @param _secondAmount The amount of _token to be swapped to tokenA or tokenB
-     * @param _addLiqDescriptor Parameters needed to add liquidity
-     * @param _swapData The transaction to swap _token to tokenA or tokenB
+     * @param _amount The recieved amount of token A
+     * @param _dexDescriptor The description of dex that swap tokenA-->tokenB should be done through that
+     * @param _addLiquidityDeadline Unix timestamp after which the addLiquidity will revert
      */
-    function investByTokenAOrTokenB(
+    function investByTokenA(
         address _userAddress,
-        IERC20Upgradeable _token,
         uint256 _amount,
-        uint256 _secondAmount,
-        AddLiqDescriptor memory _addLiqDescriptor,
-        bytes calldata _swapData
+        DexDescriptor memory _dexDescriptor,
+        uint256 _addLiquidityDeadline
     ) external payable whenNotPaused refund(_userAddress) {
         IERC20Upgradeable _tokenA = tokenA; // gas savings
         IERC20Upgradeable _tokenB = tokenB; // gas savings
-        require(_token == _tokenA || _token == _tokenB, "oe04");
-        require(_amount > _secondAmount, "oe04");
+        FeeStruct memory _feeStruct = feeStruct; // gas savings
+        uint256 _amountA;
+        uint256 _amountB;
 
         // Allow investment by coin
         if (msg.value > 0 && address(coinWrapper) != address(0)) {
-            address(_token) == address(coinWrapper)
+            address(_tokenA) == address(coinWrapper)
                 ? coinWrapper.deposit{value: msg.value}()
                 : revert(
                     "msg.value is sent but the given token is not a wrapper token"
                 );
         } else {
             require(msg.value == 0, "oe03");
-            _transferFrom(_token, _amount);
+            _transferFrom(_tokenA, _amount);
         }
 
-        emit InvestedByTokenAOrTokenB(_userAddress, address(_token), _amount);
+        emit InvestedByTokenAOrTokenB(_userAddress, address(_tokenA), _amount);
 
-        uint256 _totalFee = _deductFee(
-            addLiquidityFee + stakeFee,
-            _token,
-            _amount
-        );
-        _amount = _amount - _totalFee;
+        {
+            uint256 _amountA2B = _calculateDesiredAmountIn(
+                _tokenA,
+                _amount,
+                _feeStruct.dexFee,
+                _feeStruct.aggregatorFee +
+                    _feeStruct.addLiquidityFee +
+                    _feeStruct.stakeFee
+            );
+            _amountB = _swap(
+                _tokenA,
+                _tokenB,
+                _amountA2B,
+                address(this),
+                _dexDescriptor
+            );
+            _amountA = _amount - _amountA2B;
+        }
 
-        uint256 _amountOut = _swap(
-            _token,
-            _token == _tokenA ? _tokenB : _tokenA,
-            _secondAmount,
-            _swapData
-        );
-        require(
-            _amountOut >=
-                (
-                    _token == _tokenA
-                        ? _addLiqDescriptor.amountBDesired
-                        : _addLiqDescriptor.amountADesired
-                ),
-            "oe01"
-        );
+        {
+            uint256 _totalFee = _deductFee(
+                _feeStruct.addLiquidityFee + _feeStruct.stakeFee,
+                _tokenB,
+                _amountB
+            );
 
-        uint256 _liquidity = _addLiquidity(_addLiqDescriptor);
+            _amountB -= _totalFee;
+        }
+
+        uint256 _liquidity = _addLiquidity(
+            _getAddLiquidityParameters(
+                _amountA,
+                _amountB,
+                _addLiquidityDeadline
+            )
+        );
+        _stake(_userAddress, _liquidity);
+    }
+
+    /**
+     * @dev Only token B is received
+     * @param _userAddress The address of the user
+     * @param _amount The recieved amount of token B
+     * @param _dexDescriptor The description of dex that swap tokenB-->tokenA should be done through that
+     * @param _addLiquidityDeadline Unix timestamp after which the addLiquidity will revert
+     */
+    function investByTokenB(
+        address _userAddress,
+        uint256 _amount,
+        DexDescriptor memory _dexDescriptor,
+        uint256 _addLiquidityDeadline
+    ) external payable whenNotPaused refund(_userAddress) {
+        IERC20Upgradeable _tokenA = tokenA; // gas savings
+        IERC20Upgradeable _tokenB = tokenB; // gas savings
+        FeeStruct memory _feeStruct = feeStruct; // gas savings
+        uint256 _amountA;
+        uint256 _amountB;
+
+        // Allow investment by coin
+        if (msg.value > 0 && address(coinWrapper) != address(0)) {
+            address(_tokenB) == address(coinWrapper)
+                ? coinWrapper.deposit{value: msg.value}()
+                : revert(
+                    "msg.value is sent but the given token is not a wrapper token"
+                );
+        } else {
+            require(msg.value == 0, "oe03");
+            _transferFrom(_tokenB, _amount);
+        }
+
+        emit InvestedByTokenAOrTokenB(_userAddress, address(_tokenB), _amount);
+
+        {
+            uint256 _totalFee = _deductFee(
+                _feeStruct.addLiquidityFee + _feeStruct.stakeFee,
+                _tokenB,
+                _amount
+            );
+            _amountB = _amount - _totalFee;
+        }
+
+        {
+            uint256 _amountB2A = _calculateDesiredAmountIn(
+                _tokenB,
+                _amountB,
+                _feeStruct.dexFee,
+                _feeStruct.aggregatorFee
+            );
+
+            _amountA = _swap(
+                _tokenB,
+                _tokenA,
+                _amountB2A,
+                address(this),
+                _dexDescriptor
+            );
+            _amountB -= _amountB2A;
+        }
+
+        uint256 _liquidity = _addLiquidity(
+            _getAddLiquidityParameters(
+                _amountA,
+                _amountB,
+                _addLiquidityDeadline
+            )
+        );
         _stake(_userAddress, _liquidity);
     }
 
@@ -279,21 +391,29 @@ abstract contract Opportunity is
      * @param _userAddress The address of the user
      * @param _token The address of the token to be invested
      * @param _amount The amount of _token to be swapped
-     * @param _secondAmount The amount of tokenB to be swapped to tokenA
-     * @param _addLiqDescriptor Parameters needed to add liquidity
-     * @param _swapDataToB The transaction to swap _token to tokenB
-     * @param _swapDataToA The transaction to swap tokenB to tokenA
+     * @param _dexDescriptorB The description of dex that swap token-->tokenB should be done through that
+     * @param _dexDescriptorA The description of dex that swap tokenB-->tokenA should be done through that
      */
     function investByToken(
         address _userAddress,
         IERC20Upgradeable _token,
         uint256 _amount,
-        uint256 _secondAmount,
-        AddLiqDescriptor memory _addLiqDescriptor,
-        bytes calldata _swapDataToB,
-        bytes calldata _swapDataToA
+        DexDescriptor memory _dexDescriptorB,
+        DexDescriptor memory _dexDescriptorA,
+        uint256 _deadline
     ) external payable whenNotPaused refund(_userAddress) {
-        require(_amount > _secondAmount, "oe03");
+        IERC20Upgradeable _tokenA = tokenA; // gas savings
+        IERC20Upgradeable _tokenB = tokenB; // gas savings
+        FeeStruct memory _feeStruct = feeStruct; // gas savings
+        uint256 _amountA;
+        uint256 _amountB;
+        require(
+            _token != _tokenA &&
+                _token != _tokenB &&
+                (address(coinWrapper) == address(0) || !_token.isETH()),
+            "oexxx1 IDENTICAL_ADDRESSES"
+        ); //todo BLOC-1401 change in the test
+
         if (_token.isETH()) {
             require(msg.value >= _amount, "oe03");
         } else {
@@ -303,24 +423,49 @@ abstract contract Opportunity is
 
         emit InvestedByToken(_userAddress, address(_token), _amount);
 
-        uint256 _totalFee = _deductFee(
-            addLiquidityFee + stakeFee,
+        _amountB = _swap(
             _token,
-            _amount
-        );
-        _amount = _amount - _totalFee;
-
-        uint256 _amountOut = _swap(_token, tokenB, _amount, _swapDataToB);
-        require(
-            _amountOut >= _addLiqDescriptor.amountBDesired + _secondAmount,
-            "oe01"
+            _tokenB,
+            _amount,
+            address(this),
+            _dexDescriptorB
         );
 
-        _amountOut = _swap(tokenB, tokenA, _secondAmount, _swapDataToA);
-        require(_amountOut >= _addLiqDescriptor.amountADesired, "oe02");
+        {
+            uint256 _totalFee = _deductFee(
+                _feeStruct.addLiquidityFee + _feeStruct.stakeFee,
+                _tokenB,
+                _amountB
+            );
+            _amountB -= _totalFee;
+        }
 
-        uint256 _liquidity = _addLiquidity(_addLiqDescriptor);
-        _stake(_userAddress, _liquidity);
+        {
+            uint256 _amountInSwap2 = _calculateDesiredAmountIn(
+                _tokenB,
+                _amountB,
+                _feeStruct.dexFee,
+                _feeStruct.aggregatorFee
+            );
+            _amountA = _swap(
+                _tokenB,
+                _tokenA,
+                _amountInSwap2,
+                address(this),
+                _dexDescriptorA
+            );
+            _amountB -= _amountInSwap2;
+        }
+        {
+            AddLiqDescriptor
+                memory _addLiqDescriptor = _getAddLiquidityParameters(
+                    _amountA,
+                    _amountB,
+                    _deadline
+                );
+
+            _stake(_userAddress, _addLiquidity(_addLiqDescriptor));
+        }
     }
 
     /**
@@ -336,7 +481,7 @@ abstract contract Opportunity is
 
         emit InvestedByLP(_userAddress, _amountLP);
 
-        uint256 _totalFee = _deductFee(stakeFee, pair, _amountLP);
+        uint256 _totalFee = _deductFee(feeStruct.stakeFee, pair, _amountLP);
         _amountLP = _amountLP - _totalFee;
 
         _stake(_userAddress, _amountLP);
@@ -348,6 +493,7 @@ abstract contract Opportunity is
     function leave(
         RemoveLiqDescriptor memory _removeLiqDescriptor
     ) external whenNotPaused {
+        FeeStruct memory _feeStruct = feeStruct; // gas savings
         (uint256 _amountLP, uint256 _rewards) = _unstake(
             _removeLiqDescriptor.amount
         );
@@ -357,7 +503,7 @@ abstract contract Opportunity is
         }
 
         uint256 _totalFee = _deductFee(
-            unstakeFee + removeLiquidityFee,
+            _feeStruct.unstakeFee + _feeStruct.removeLiquidityFee,
             pair,
             _removeLiqDescriptor.amount
         );
@@ -369,32 +515,42 @@ abstract contract Opportunity is
 
     function setFeeTo(address payable _feeTo) external onlyOwner {
         require(_feeTo != address(0), "oe12");
-        feeTo = _feeTo;
+        feeStruct.feeTo = _feeTo;
         emit SetFeeTo(msg.sender, _feeTo);
     }
 
     function setAddLiquidityFee(uint256 _feePercentage) external onlyOwner {
         require(_feePercentage <= 1e20, "fee percentage is not valid");
-        addLiquidityFee = _feePercentage;
+        feeStruct.addLiquidityFee = _feePercentage;
         emit SetFee(msg.sender, _feePercentage);
     }
 
     function setRemoveLiquidityFee(uint256 _feePercentage) external onlyOwner {
         require(_feePercentage <= 1e20, "fee percentage is not valid");
-        removeLiquidityFee = _feePercentage;
+        feeStruct.removeLiquidityFee = _feePercentage;
         emit SetFee(msg.sender, _feePercentage);
     }
 
     function setStakeFee(uint256 _feePercentage) external onlyOwner {
         require(_feePercentage <= 1e20, "fee percentage is not valid");
-        stakeFee = _feePercentage;
+        feeStruct.stakeFee = _feePercentage;
         emit SetFee(msg.sender, _feePercentage);
     }
 
     function setUnstakeFee(uint256 _feePercentage) external onlyOwner {
         require(_feePercentage <= 1e20, "fee percentage is not valid");
-        unstakeFee = _feePercentage;
+        feeStruct.unstakeFee = _feePercentage;
         emit SetFee(msg.sender, _feePercentage);
+    }
+
+    function setDexFee(uint256 _feePercentage) external onlyOwner {
+        require(_feePercentage <= 1e20, "fee percentage is not valid");
+        feeStruct.dexFee = _feePercentage;
+    }
+
+    function setAggregatorFee(uint256 _feePercentage) external onlyOwner {
+        require(_feePercentage <= 1e20, "fee percentage is not valid");
+        feeStruct.aggregatorFee = _feePercentage;
     }
 
     function setTokenAandTokenB(
@@ -404,10 +560,10 @@ abstract contract Opportunity is
         require(_tokenA != address(0), "oe12");
         require(_tokenB != address(0), "oe12");
         _tokenA = IERC20Upgradeable(_tokenA).isETH()
-            ? address(IWETH(_tokenA))
+            ? address(coinWrapper)
             : _tokenA;
         _tokenB = IERC20Upgradeable(_tokenB).isETH()
-            ? address(IWETH(_tokenB))
+            ? address(coinWrapper)
             : _tokenB;
 
         address _pair = IUniswapV2Factory(pairFactoryContract).getPair(
@@ -463,7 +619,7 @@ abstract contract Opportunity is
     function swap(
         IERC20Upgradeable _fromToken,
         uint256 _amount,
-        bytes calldata _data
+        bytes memory _data
     ) internal virtual returns (uint256) {
         return 0;
     }
@@ -512,7 +668,8 @@ abstract contract Opportunity is
     function _initializeContracts(
         address _tokenA,
         address _tokenB,
-        address _pairFactoryContract
+        address _pairFactoryContract,
+        address _coinWrapper
     ) internal onlyInitializing {
         require(
             _tokenA != address(0) &&
@@ -523,28 +680,23 @@ abstract contract Opportunity is
         OwnableUpgradeable.initialize();
         PausableUpgradeable.__Pausable_init();
         pairFactoryContract = _pairFactoryContract;
+        coinWrapper = IWETH(_coinWrapper);
         setTokenAandTokenB(_tokenA, _tokenB);
     }
 
     function _initializeFees(
-        address payable _feeTo,
-        uint256 _addLiquidityFee,
-        uint256 _removeLiquidityFee,
-        uint256 _stakeFee,
-        uint256 _unstakeFee
+        FeeStruct memory _feeStruct
     ) internal onlyInitializing {
         require(
-            _addLiquidityFee <= 1e20 &&
-                _removeLiquidityFee <= 1e20 &&
-                _stakeFee <= 1e20 &&
-                _unstakeFee <= 1e20,
+            _feeStruct.addLiquidityFee <= 1e20 &&
+                _feeStruct.removeLiquidityFee <= 1e20 &&
+                _feeStruct.stakeFee <= 1e20 &&
+                _feeStruct.unstakeFee <= 1e20 &&
+                _feeStruct.dexFee <= 1e20 &&
+                _feeStruct.aggregatorFee <= 1e20,
             "fee percentage is not valid"
         );
-        feeTo = _feeTo;
-        addLiquidityFee = _addLiquidityFee;
-        removeLiquidityFee = _removeLiquidityFee;
-        stakeFee = _stakeFee;
-        unstakeFee = _unstakeFee;
+        feeStruct = _feeStruct;
     }
 
     function getRewardToken() internal virtual returns (address) {
@@ -561,10 +713,29 @@ abstract contract Opportunity is
         IERC20Upgradeable _fromToken,
         IERC20Upgradeable _toToken,
         uint256 _amount,
-        bytes calldata _data
-    ) private returns (uint256) {
+        address _recieverAddress,
+        DexDescriptor memory _dexDescriptor
+    ) private returns (uint256 _amountOut) {
+        if (_dexDescriptor.isReplace) {
+            _dexDescriptor.params[_dexDescriptor.index] = abi.encode(_amount);
+        }
+        bytes memory _dexData = abi.encodePacked(_dexDescriptor.selector);
+        for (uint8 i = 0; i < _dexDescriptor.params.length; ++i) {
+            _dexData = abi.encodePacked(_dexData, _dexDescriptor.params[i]);
+        }
+
+        bytes memory _aggregatorData = abi.encodeWithSelector(
+            ICrowdswapAggregator.swap.selector,
+            address(_fromToken),
+            address(_toToken),
+            _recieverAddress,
+            _amount,
+            _dexDescriptor.flag,
+            _dexData
+        );
+
         uint256 _beforeBalance = _toToken.uniBalanceOf(address(this));
-        uint256 _amountOut = swap(_fromToken, _amount, _data);
+        _amountOut = swap(_fromToken, _amount, _aggregatorData);
         uint256 _afterBalance = _toToken.uniBalanceOf(address(this));
         require(_afterBalance - _beforeBalance == _amountOut, "oe05");
         emit Swapped(
@@ -636,7 +807,7 @@ abstract contract Opportunity is
         uint256 _amount
     ) private returns (uint256 _totalFee) {
         _totalFee = _calculateFee(_amount, _percentage);
-        _token.uniTransfer(feeTo, _totalFee);
+        _token.uniTransfer(feeStruct.feeTo, _totalFee);
         emit FeeDeducted(msg.sender, address(_token), _amount, _totalFee);
     }
 
@@ -667,5 +838,70 @@ abstract contract Opportunity is
             _token.uniTransfer(payable(_userAddress), _amount);
         }
         emit Refund(_userAddress, address(_token), _amount);
+    }
+
+    function _getReserves()
+        private
+        view
+        returns (uint256 _reserveA, uint256 _reserveB)
+    {
+        IUniswapV2Pair _pair = IUniswapV2Pair(address(pair));
+        address token0 = _pair.token0();
+        if (token0 == address(tokenA)) {
+            (_reserveA, _reserveB, ) = _pair.getReserves();
+        } else {
+            (_reserveB, _reserveA, ) = _pair.getReserves();
+        }
+    }
+
+    function _calculateDesiredAmountIn(
+        IERC20Upgradeable _token,
+        uint256 _amount,
+        uint256 _feeIn,
+        uint256 _feeOut
+    ) private view returns (uint256 _amountDesired) {
+        uint256 _j = 1000 - (_feeIn * 10) / 1 ether;
+        uint256 _z = 1000 - (_feeOut * 10) / 1 ether;
+        (uint256 _reserveTokenA, uint256 _reserveTokenB) = _getReserves();
+        uint256 _reserveToken = address(_token) == address(tokenA)
+            ? _reserveTokenA
+            : _reserveTokenB;
+
+        uint256 _a = _z * _j;
+        uint256 _b = (((_z * _j) + 10 ** 6) * _reserveToken) / 10 ** 3;
+        uint256 _c = _amount * _reserveToken;
+
+        _amountDesired = ((Math.sqrt(_b ** 2 + 4 * _a * _c) - _b) * 500) / _a;
+    }
+
+    function _getAddLiquidityParameters(
+        uint _amountA,
+        uint _amountB,
+        uint256 _deadline
+    ) private view returns (AddLiqDescriptor memory _addLiqDescriptor) {
+        (uint256 _reserveTokenA, uint256 _reserveTokenB) = _getReserves();
+        uint256 _amountTokenADesired = _amountA;
+        uint256 _amountTokenBDesired = (_amountTokenADesired * _reserveTokenB) /
+            _reserveTokenA;
+
+        if (_amountTokenBDesired > _amountB) {
+            //calaculate based on amount B
+            _amountTokenBDesired = _amountB;
+            _amountTokenADesired =
+                (_amountTokenBDesired * _reserveTokenA) /
+                _reserveTokenB;
+            if (_amountTokenADesired > _amountA) {
+                revert("XXXXXXX");
+            }
+        }
+
+        uint256 _amountTokenBMin = (_amountTokenBDesired * 98) / 100;
+        uint256 _amountTokenAMin = (_amountTokenADesired * 98) / 100;
+
+        _addLiqDescriptor.amountADesired = _amountTokenADesired;
+        _addLiqDescriptor.amountBDesired = _amountTokenBDesired;
+        _addLiqDescriptor.amountAMin = _amountTokenAMin;
+        _addLiqDescriptor.amountBMin = _amountTokenBMin;
+        _addLiqDescriptor.deadline = _deadline;
     }
 }

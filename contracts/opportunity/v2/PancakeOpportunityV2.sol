@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.10;
 
-import "./Opportunity.sol";
-import "../libraries/UniERC20Upgradeable.sol";
-import "../interfaces/IUniswapV2Router02.sol";
-import "../interfaces/IPancakeMasterChefV2.sol";
+import "./OpportunityV2.sol";
+import "../../libraries/UniERC20Upgradeable.sol";
+import "../../interfaces/IUniswapV2Router02.sol";
+import "../../interfaces/IPancakeMasterChefV2.sol";
 import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/AddressUpgradeable.sol";
 
@@ -14,7 +14,7 @@ import "@openzeppelin/contracts-upgradeable/utils/AddressUpgradeable.sol";
  * stake/unstake the corresponding LP token
  * currently supported pools: cake-bnb, cake-usdt, cake-busd, busd-bnb
  */
-contract PancakeOpportunity is Opportunity, ReentrancyGuardUpgradeable {
+contract PancakeOpportunityV2 is OpportunityV2, ReentrancyGuardUpgradeable {
     using UniERC20Upgradeable for IERC20Upgradeable;
 
     address public swapContract;
@@ -28,21 +28,6 @@ contract PancakeOpportunity is Opportunity, ReentrancyGuardUpgradeable {
         uint256 lpBalance;
         uint256 distributedReward;
         bool exist;
-    }
-    /**
-     * @dev A struct containing parameters needed to calculate fees
-     * @member feeTo The address of recipient of the fees
-     * @member addLiquidityFee The initial fee of Add Liquidity step
-     * @member removeLiquidityFee The initial fee of Remove Liquidity step
-     * @member stakeFee The initial fee of Stake step
-     * @member unstakeFee The initial fee of Unstake step
-     */
-    struct FeeStruct {
-        address payable feeTo;
-        uint256 addLiquidityFee;
-        uint256 removeLiquidityFee;
-        uint256 stakeFee;
-        uint256 unstakeFee;
     }
 
     mapping(address => UserInfo) public userInfo;
@@ -60,7 +45,7 @@ contract PancakeOpportunity is Opportunity, ReentrancyGuardUpgradeable {
      * @param _tokenB The address of the B token
      * @param _rewardToken The address of the reward token
      * @param _pairFactoryContract The address of the pair
-     * @param feeStruct Parameters needed for fee
+     * @param _feeStruct Parameters needed for fee
      * @param _swapContract The address of the CrowdSwap Swap Contract
      * @param _router The address of the PancakeSwap: Router v2 Contract
      * @param _pancakeMasterChefV2 The address of the Stake LP Contract
@@ -71,24 +56,20 @@ contract PancakeOpportunity is Opportunity, ReentrancyGuardUpgradeable {
         address _tokenB,
         address _rewardToken,
         address _pairFactoryContract,
-        FeeStruct memory feeStruct,
+        FeeStruct memory _feeStruct,
         address _swapContract,
         address _router,
         address _pancakeMasterChefV2,
-        uint256 _pId
+        uint256 _pId,
+        address _coinWrapper
     ) public initializer {
-        Opportunity._initializeContracts(
+        OpportunityV2._initializeContracts(
             _tokenA,
             _tokenB,
-            _pairFactoryContract
+            _pairFactoryContract,
+            _coinWrapper
         );
-        Opportunity._initializeFees(
-            feeStruct.feeTo,
-            feeStruct.addLiquidityFee,
-            feeStruct.removeLiquidityFee,
-            feeStruct.stakeFee,
-            feeStruct.unstakeFee
-        );
+        OpportunityV2._initializeFees(_feeStruct);
         swapContract = _swapContract;
         router = IUniswapV2Router02(_router);
         pancakeMasterChefV2 = IPancakeMasterChefV2(_pancakeMasterChefV2);
@@ -185,7 +166,7 @@ contract PancakeOpportunity is Opportunity, ReentrancyGuardUpgradeable {
     function swap(
         IERC20Upgradeable _fromToken,
         uint256 _amount,
-        bytes calldata _data
+        bytes memory _data
     ) internal override returns (uint256) {
         address _swapContract = swapContract; // gas savings
         if (!_fromToken.isETH()) {
@@ -293,11 +274,11 @@ contract PancakeOpportunity is Opportunity, ReentrancyGuardUpgradeable {
         }
     }
 
-    function getRewardToken() internal override returns (address) {
+    function getRewardToken() internal view override returns (address) {
         return address(rewardToken);
     }
 
-    function getNewRewards() internal override returns (uint256) {
+    function getNewRewards() internal view override returns (uint256) {
         return newRewards;
     }
 }

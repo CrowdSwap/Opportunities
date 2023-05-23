@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.10;
 
-import "./Opportunity.sol";
-import "../libraries/UniERC20Upgradeable.sol";
-import "../interfaces/IUniswapV2Router02.sol";
-import "../interfaces/IStakingLP.sol";
+import "./OpportunityV2.sol";
+import "../../libraries/UniERC20Upgradeable.sol";
+import "../../interfaces/IUniswapV2Router02.sol";
+import "../../interfaces/IStakingLP.sol";
 
 import "@openzeppelin/contracts-upgradeable/utils/AddressUpgradeable.sol";
 
@@ -13,7 +13,7 @@ import "@openzeppelin/contracts-upgradeable/utils/AddressUpgradeable.sol";
  * @notice The contract is used to add/remove liquidity in crowd/usdt pool and
  * stake/unstake the corresponding LP token
  */
-contract CrowdUsdtLpStakeOpportunity is Opportunity {
+contract CrowdUsdtLpStakeOpportunityV2 is OpportunityV2 {
     using UniERC20Upgradeable for IERC20Upgradeable;
 
     address public swapContract;
@@ -26,12 +26,8 @@ contract CrowdUsdtLpStakeOpportunity is Opportunity {
      * @dev The contract constructor
      * @param _tokenCrowd The address of the CROWD token
      * @param _tokenUsdt The address of the USDT token
-     * @param _pairFactoryContract The address of the uniswapV2 Factory
-     * @param _feeTo The address of recipient of the fees
-     * @param _addLiquidityFee The initial fee of Add Liquidity step
-     * @param _removeLiquidityFee The initial fee of Remove Liquidity step
-     * @param _stakeFee The initial fee of Stake step
-     * @param _unstakeFee The initial fee of Unstake step
+     * @param _pairFactoryContract The address of the pair USDT/CROWD
+     * @param _feeStruct Parameters needed for fee
      * @param _swapContract The address of the CrowdSwap Swap Contract
      * @param _router The address of the QuickSwap Router Contract
      * @param _stakingLP The address of the Stake LP Contract
@@ -40,27 +36,19 @@ contract CrowdUsdtLpStakeOpportunity is Opportunity {
         address _tokenCrowd,
         address _tokenUsdt,
         address _pairFactoryContract,
-        address payable _feeTo,
-        uint256 _addLiquidityFee,
-        uint256 _removeLiquidityFee,
-        uint256 _stakeFee,
-        uint256 _unstakeFee,
+        FeeStruct memory _feeStruct,
         address _swapContract,
         address _router,
-        address _stakingLP
+        address _stakingLP,
+        address _coinWrapper
     ) public initializer {
-        Opportunity._initializeContracts(
+        OpportunityV2._initializeContracts(
             _tokenCrowd,
             _tokenUsdt,
-            _pairFactoryContract
+            _pairFactoryContract,
+            _coinWrapper
         );
-        Opportunity._initializeFees(
-            _feeTo,
-            _addLiquidityFee,
-            _removeLiquidityFee,
-            _stakeFee,
-            _unstakeFee
-        );
+        OpportunityV2._initializeFees(_feeStruct);
         swapContract = _swapContract;
         router = IUniswapV2Router02(_router);
         stakingLP = IStakingLP(_stakingLP);
@@ -87,7 +75,7 @@ contract CrowdUsdtLpStakeOpportunity is Opportunity {
     function swap(
         IERC20Upgradeable _fromToken,
         uint256 _amount,
-        bytes calldata _data
+        bytes memory _data
     ) internal override returns (uint256) {
         address _swapContract = swapContract; // gas savings
         if (!_fromToken.isETH()) {

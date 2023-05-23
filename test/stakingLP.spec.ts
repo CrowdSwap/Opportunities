@@ -703,6 +703,60 @@ describe("StakingLP", async () => {
         ethers.utils.parseEther("800000")
       );
     });
+
+    it("reward situation when reward < rewardsDuration", async () => {
+      const { stakingLP2, crowdUsdtPair, CROWD, crowdUsdtLpStakeOpportunity } =
+        await loadFixture(stakingLpFixture);
+      await stakingLP2.setOpportunityContract(
+        crowdUsdtLpStakeOpportunity.address
+      );
+      await stakingLP2.setResonateAdapter(
+        "0x127F6e566212d3477b34725C9D1a422d6D960c97"
+      );
+
+      console.log(`rewards: 0.000000000008  rewardDuration: 200`);
+      const rewards = ethers.utils.parseEther("0.000000000008");
+      await notify(CROWD, rewards, stakingLP2); // Duration 17,280,000
+      expect(await CROWD.balanceOf(stakingLP2.address)).to.equal(rewards);
+      // 8000000 * 1e6 / (200 * 24 * 3600) = 462962.962962963
+      const rewartRate1 = await stakingLP2.rewardRate();
+      expect(+ethers.utils.formatUnits(rewartRate1, 6)).to.gte(0.462962);
+
+      console.log("rewardRate", +ethers.utils.formatUnits(rewartRate1, 6));
+      await stakingLP2.addToEligibleUsers([userAccount.address]);
+
+      await moveTimeForward(5 * 24 * 3600); //day 0
+
+      const amountLP = ethers.utils.parseEther("5");
+      const opportunity = await mintAndApprove(
+        crowdUsdtPair,
+        amountLP,
+        crowdUsdtLpStakeOpportunity,
+        stakingLP2
+      );
+      expect(await stakingLP2.balanceOf(userAccount.address)).to.equal(0);
+      await expect(
+        stakingLP2.connect(opportunity).stakeLP(amountLP, userAccount.address)
+      )
+        .to.emit(stakingLP2, "LPStaked")
+        .withArgs(userAccount.address, amountLP);
+      expect(await stakingLP2.balanceOf(userAccount.address)).to.equal(
+        amountLP
+      );
+      const earn1 = await stakingLP2.earned(userAccount.address);
+      console.log("earn after start time", earn1);
+      expect(await stakingLP2.earned(userAccount.address)).to.gte(0);
+
+      await moveTimeForward(5 * 24 * 3600); //day 5
+
+      const earn2 = await stakingLP2.earned(userAccount.address);
+      console.log("earn after 5 days", ethers.utils.formatEther(earn2));
+
+      await moveTimeForward(5 * 24 * 3600); //day 10
+
+      const earn3 = await stakingLP2.earned(userAccount.address);
+      console.log("earn after 10 days", ethers.utils.formatEther(earn3));
+    });
   });
 
   describe("setRewardsDuration", async () => {
