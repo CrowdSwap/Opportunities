@@ -1,4 +1,3 @@
-import { Dexchanges, Networks, TokenListBySymbol } from "@crowdswap/constant";
 import { Fixture } from "ethereum-waffle";
 import { Address } from "ethereumjs-util";
 import { BigNumber, Wallet } from "ethers";
@@ -6,20 +5,20 @@ import { ethers, upgrades } from "hardhat";
 import {
   CrowdUsdtLpStakeOpportunityV2,
   CrowdUsdtLpStakeOpportunityV2__factory,
-  CrowdswapV1,
-  CrowdswapV1__factory,
+  CrowdswapV1Test__factory,
+  CrowdswapV1Test,
   ERC20PresetMinterPauser,
-  Erc20Test__factory,
+  ERC20PresetMinterPauser__factory as Erc20Test__factory,
   StakingLP,
   StakingLP__factory,
-  UniswapV2Factory,
-  UniswapV2Pair,
-  UniswapV2Pair__factory,
-  UniswapV2Router02,
+  UniswapV2FactoryTest as UniswapV2Factory,
+  IUniswapV2PairTest as UniswapV2Pair,
+  IUniswapV2PairTest__factory as UniswapV2Pair__factory,
+  IUniswapV2Router02 as UniswapV2Router02,
   WETH,
   WETH__factory,
-} from "../../../../artifacts/types";
-import { createDexUniswapV2 } from "../../uniswap/v2/uniswapV2.fixture";
+} from "../../artifacts/types";
+import { createDexUniswapV2 } from "./uniswapV2.fixture";
 
 export const ADD_LIQUIDITY_FEE_PERCENTAGE = 0.1;
 export const REMOVE_LIQUIDITY_FEE_PERCENTAGE = 0.1;
@@ -37,28 +36,52 @@ const tokenFixture: Fixture<{
 }> = async ([wallet], provider) => {
   const signer = provider.getSigner(wallet.address);
 
-  let token = TokenListBySymbol.POLYGON_MAINNET["CROWD"];
+  let token = {
+    chainId: 137,
+    address: "0x483dd3425278C1f79F377f1034d9d2CaE55648B6",
+    name: "Crowd Token",
+    symbol: "CROWD",
+    decimals: 18,
+  };
   const CROWD = await new Erc20Test__factory(signer).deploy(
     token.name,
-    token.symbol,
-    token.decimals
+    token.symbol
+    // token.decimals
   );
 
-  token = TokenListBySymbol.POLYGON_MAINNET["USDT"];
+  token = {
+    chainId: 137,
+    address: "0xc2132D05D31c914a87C6611C10748AEb04B58e8F",
+    name: "USDT-Tether USD (PoS)",
+    symbol: "USDT",
+    decimals: 6,
+  };
   const USDT = await new Erc20Test__factory(signer).deploy(
     token.name,
-    token.symbol,
-    token.decimals
+    token.symbol
+    // token.decimals
   );
 
-  token = TokenListBySymbol.POLYGON_MAINNET["DAI"];
+  token = {
+    chainId: 137,
+    address: "0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063",
+    name: "DAI-Dai Stablecoin",
+    symbol: "DAI",
+    decimals: 18,
+  };
   const DAI = await new Erc20Test__factory(signer).deploy(
     token.name,
-    token.symbol,
-    token.decimals
+    token.symbol
+    // token.decimals
   );
 
-  token = TokenListBySymbol.POLYGON_MAINNET["WMATIC"];
+  token = {
+    chainId: 137,
+    address: "0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270",
+    name: "Wrapped Matic",
+    symbol: "WMATIC",
+    decimals: 18,
+  };
   const WMATIC = await new WETH__factory(signer).deploy();
 
   return {
@@ -73,7 +96,7 @@ const tokenFixture: Fixture<{
 export const crowdUsdtLpStakeOpportunityFixtureV2: Fixture<{
   crowdUsdtOpportunity: CrowdUsdtLpStakeOpportunityV2;
   crowdWmaticOpportunity: CrowdUsdtLpStakeOpportunityV2;
-  crowdswapV1: CrowdswapV1;
+  crowdswapV1: CrowdswapV1Test;
   uniswapV2: UniswapV2Router02;
   sushiswap: UniswapV2Router02;
   quickswap: UniswapV2Router02;
@@ -122,10 +145,10 @@ export const crowdUsdtLpStakeOpportunityFixtureV2: Fixture<{
     const initialAmountDaiInPair = "1000";
     const initialAmountWmaticInPair = "1000";
     const { router, factory } = await createDexUniswapV2(wallet, WMATIC);
-    const d =
-      Dexchanges[dexName].networks[Networks.MAINNET] ??
-      Dexchanges[dexName].networks[Networks.POLYGON_MAINNET];
-    const flag = d[0].code;
+    // const d =
+    //   Dexchanges[dexName].networks[Networks.MAINNET] ??
+    //   Dexchanges[dexName].networks[Networks.POLYGON_MAINNET];
+    const flag = getDexFlag(dexName);
     const dex: UniswapV2Fork = new UniswapV2Fork(router, factory, flag);
     await dex.createPair(
       CROWD,
@@ -182,7 +205,7 @@ export const crowdUsdtLpStakeOpportunityFixtureV2: Fixture<{
     return { adr: dex.router.address, flag: dex.flag };
   });
 
-  const crowdswapV1 = await new CrowdswapV1__factory(signer).deploy(
+  const crowdswapV1 = await new CrowdswapV1Test__factory(signer).deploy(
     dexAddressFlags
   );
 
@@ -303,6 +326,19 @@ export const crowdUsdtLpStakeOpportunityFixtureV2: Fixture<{
     crowdWmaticPair,
   };
 };
+function getDexFlag(dexName: string): any {
+  if (dexName == "UniswapV2") {
+    return 0x1;
+  } else if (dexName == "Sushiswap") {
+    return 0x03;
+  } else if (dexName == "Quickswap") {
+    return 0x08;
+  } else if (dexName == "Apeswap") {
+    return 0x09;
+  } else if (dexName == "Radioshack") {
+    return 0x20;
+  }
+}
 
 class UniswapV2Fork {
   private readonly _router: UniswapV2Router02;

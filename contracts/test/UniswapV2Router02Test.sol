@@ -5,6 +5,7 @@ import "./BaseTest.sol";
 import "./UniswapV2FactoryTest.sol";
 import "../interfaces/IUniswapV2Router02.sol";
 import "./lib/UniswapV2LibraryTest.sol";
+import "../interfaces/IWETH.sol";
 
 contract UniswapV2Router02Test is IUniswapV2Router02, BaseTest {
     address public factory;
@@ -190,5 +191,43 @@ contract UniswapV2Router02Test is IUniswapV2Router02, BaseTest {
                 (amountA, amountB) = (amountAOptimal, amountBDesired);
             }
         }
+    }
+
+    function addLiquidityETH(
+        address token,
+        uint256 amountTokenDesired,
+        uint256 amountTokenMin,
+        uint256 amountETHMin,
+        address to,
+        uint256 deadline
+    )
+        external
+        payable
+        virtual
+        override
+        ensure(deadline)
+        returns (uint256 amountToken, uint256 amountETH, uint256 liquidity)
+    {
+        (amountToken, amountETH) = _addLiquidity(
+            token,
+            WETH,
+            amountTokenDesired,
+            msg.value,
+            amountTokenMin,
+            amountETHMin
+        );
+        address pair = UniswapV2LibraryTest.pairFor(factory, token, WETH);
+        super._safeTransferFrom(token, msg.sender, pair, amountToken);
+        IWETH(WETH).deposit{value: amountETH}();
+        assert(IWETH(WETH).transfer(pair, amountETH));
+        liquidity = IUniswapV2PairTest(pair).mint(to);
+        // refund dust eth, if any
+        if (msg.value > amountETH)
+            super._safeTransferFrom(
+                address(0),
+                msg.sender,
+                pair,
+                msg.value - amountETH
+            );
     }
 }

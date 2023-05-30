@@ -2,19 +2,20 @@
 pragma solidity ^0.8.10;
 
 interface IUniswapV2Router02 {
-
     function swapExactETHForTokens(
         uint256 amountOutMin,
         address[] calldata path,
         address to,
-        uint256 deadline) external payable returns (uint256[] memory amounts);
+        uint256 deadline
+    ) external payable returns (uint256[] memory amounts);
 
     function swapExactTokensForETH(
         uint256 amountIn,
         uint256 amountOutMin,
         address[] calldata path,
         address to,
-        uint256 deadline) external returns (uint256[] memory amounts);
+        uint256 deadline
+    ) external returns (uint256[] memory amounts);
 
     function swapExactTokensForTokens(
         uint256 amountIn,
@@ -53,4 +54,16 @@ interface IUniswapV2Router02 {
         address to,
         uint deadline
     ) external returns (uint amountToken, uint amountETH);
+
+    function addLiquidityETH(
+        address token,
+        uint amountTokenDesired,
+        uint amountTokenMin,
+        uint amountETHMin,
+        address to,
+        uint deadline
+    )
+        external
+        payable
+        returns (uint amountToken, uint amountETH, uint liquidity);
 }

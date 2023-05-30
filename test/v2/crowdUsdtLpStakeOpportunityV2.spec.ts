@@ -1,4 +1,3 @@
-import { Dexchanges, Networks } from "@crowdswap/constant";
 import { AddressZero } from "@ethersproject/constants";
 import { expect } from "chai";
 import { BigNumber } from "ethers";
@@ -9,7 +8,7 @@ import {
   STAKE_FEE_PERCENTAGE,
   UNSTAKE_FEE_PERCENTAGE,
   crowdUsdtLpStakeOpportunityFixtureV2,
-} from "../../shared/opportunity/v2/crowdUsdtLpStakeOpportunityV2.fixture";
+} from "./crowdUsdtLpStakeOpportunityV2.fixture";
 
 describe("CrowdUsdtLpStakeOpportunity", async () => {
   let loadFixture: ReturnType<typeof waffle.createFixtureLoader>;
