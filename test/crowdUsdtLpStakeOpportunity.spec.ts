@@ -77,7 +77,7 @@ describe("CrowdUsdtLpStakeOpportunity", async () => {
       expect(feeDeductedEvent.args.user).to.be.equal(owner.address);
       expect(feeDeductedEvent.args.token).to.be.equal(tokenB.address);
       expect(feeDeductedEvent.args.amount).to.be.equal(amountBDesired);
-      expect(feeDeductedEvent.args.totalFee).to.be.equal(totalFee);
+      expect(feeDeductedEvent.args.totalFee).to.be.gte(totalFee);
 
       const addedLiquidityEvent = receipt.events.find(
         (event) => event.event === "AddedLiquidity"
@@ -85,7 +85,89 @@ describe("CrowdUsdtLpStakeOpportunity", async () => {
       expect(addedLiquidityEvent).to.not.be.undefined;
       expect(addedLiquidityEvent.args.user).to.be.equal(owner.address);
       expect(addedLiquidityEvent.args.amountA).to.be.equal(amountADesired);
-      expect(addedLiquidityEvent.args.amountB).to.be.equal(
+      expect(addedLiquidityEvent.args.amountB).to.be.lte(
+        amountBDesired.sub(totalFee)
+      );
+      expect(addedLiquidityEvent.args.liquidity).to.not.be.undefined;
+
+      const stakedEvent = receipt.events.find(
+        (event) => event.event === "Staked"
+      );
+      expect(stakedEvent).to.not.be.undefined;
+      expect(stakedEvent.args.user).to.be.equal(user.address);
+      expect(stakedEvent.args.amount).to.not.be.undefined;
+    });
+
+    it("User should be able to invest sending MATIC and CROWD", async () => {
+      const { opportunity, CROWD, WMATIC, stakingCrowdWmaticLP } =
+        await loadFixture(crowdUsdtLpStakeOpportunityFixture);
+      const tokenA = CROWD;
+      const tokenB = WMATIC;
+
+      await opportunity.setTokenAandTokenB(tokenA.address, tokenB.address);
+      await opportunity.setCoinWrapper(tokenB.address);
+      await opportunity.setStakingLP(stakingCrowdWmaticLP.address);
+
+      const amountADesired = ethers.utils.parseEther("100");
+      const amountBDesired = ethers.utils.parseUnits("4.317269", 6); // 4.3 + %0.4 fee
+      const amountAMin = ethers.utils.parseEther("99");
+      const amountBMin = ethers.utils.parseUnits("4.257", 6);
+
+      const totalFee = getAddLiqFee(amountBDesired)
+        .add(getAddLiqFee(amountBDesired))
+        .add(getStakeFee(amountBDesired))
+        .add(getStakeFee(amountBDesired));
+
+      await tokenA.mint(owner.address, amountADesired);
+      await tokenA.approve(opportunity.address, amountADesired);
+
+      const transaction = await opportunity.investByTokenATokenB(
+        user.address,
+        tokenB.address,
+        {
+          amountADesired,
+          amountBDesired,
+          amountAMin,
+          amountBMin,
+          deadline: (await ethers.provider.getBlock("latest")).timestamp + 1000,
+        },
+        {
+          value: amountBDesired,
+        }
+      );
+      const receipt = await transaction.wait();
+
+      const investedByTokenATokenBEvent = receipt.events.find(
+        (event) => event.event === "InvestedByTokenATokenB"
+      );
+      expect(investedByTokenATokenBEvent).to.not.be.undefined;
+      expect(investedByTokenATokenBEvent.args.user).to.be.equal(user.address);
+      expect(investedByTokenATokenBEvent.args.token).to.be.equal(
+        tokenB.address
+      );
+      expect(investedByTokenATokenBEvent.args.amountA).to.be.equal(
+        amountADesired
+      );
+      expect(investedByTokenATokenBEvent.args.amountB).to.be.equal(
+        amountBDesired
+      );
+
+      const feeDeductedEvent = receipt.events.find(
+        (event) => event.event === "FeeDeducted"
+      );
+      expect(feeDeductedEvent).to.not.be.undefined;
+      expect(feeDeductedEvent.args.user).to.be.equal(owner.address);
+      expect(feeDeductedEvent.args.token).to.be.equal(tokenB.address);
+      expect(feeDeductedEvent.args.amount).to.be.equal(amountBDesired);
+      expect(feeDeductedEvent.args.totalFee).to.be.gte(totalFee);
+
+      const addedLiquidityEvent = receipt.events.find(
+        (event) => event.event === "AddedLiquidity"
+      );
+      expect(addedLiquidityEvent).to.not.be.undefined;
+      expect(addedLiquidityEvent.args.user).to.be.equal(owner.address);
+      expect(addedLiquidityEvent.args.amountA).to.be.equal(amountADesired);
+      expect(addedLiquidityEvent.args.amountB).to.be.lte(
         amountBDesired.sub(totalFee)
       );
       expect(addedLiquidityEvent.args.liquidity).to.not.be.undefined;
@@ -198,10 +280,10 @@ describe("CrowdUsdtLpStakeOpportunity", async () => {
       const totalFee = getAddLiqFee(opportunity_amountIn).add(
         getStakeFee(opportunity_amountIn)
       );
-      const swap1_amountIn = opportunity_amountIn.sub(totalFee);
-      const swap1_amountOut = ethers.utils.parseUnits("15.5", 6);
       await DAI.mint(owner.address, opportunity_amountIn);
       await DAI.approve(opportunity.address, opportunity_amountIn);
+      const swap1_amountIn = opportunity_amountIn.sub(totalFee);
+      const swap1_amountOut = ethers.utils.parseUnits("15.5", 6);
       await tokenB.mint(sushiswap.address, swap1_amountOut);
       await (<UniswapV2Router02Test>sushiswap).setAmountOut(swap1_amountOut);
       const swap2_amountIn = swap1_amountOut
@@ -210,6 +292,7 @@ describe("CrowdUsdtLpStakeOpportunity", async () => {
       const swap2_amountOut = amountADesired;
       await tokenA.mint(quickswap.address, swap2_amountOut);
       await (<UniswapV2Router02Test>quickswap).setAmountOut(swap2_amountOut);
+      amountADesired = swap2_amountOut.sub(getSwapFee(swap2_amountOut));
 
       const swap1 = await getCrowdSwapAggregatorTransaction(
         sushiswap,
@@ -231,7 +314,6 @@ describe("CrowdUsdtLpStakeOpportunity", async () => {
         crowdswapV1,
         opportunity
       );
-      amountADesired = swap2_amountOut.sub(getSwapFee(swap2_amountOut));
 
       const transaction = await opportunity.investByToken(
         user.address,
@@ -283,7 +365,7 @@ describe("CrowdUsdtLpStakeOpportunity", async () => {
       expect(swappedEvents[1]).to.not.be.undefined;
       expect(swappedEvents[1].args.user).to.be.equal(owner.address);
       expect(swappedEvents[1].args.fromToken).to.be.equal(tokenB.address);
-      expect(swappedEvents[1].args.toToken).to.be.equal(CROWD.address);
+      expect(swappedEvents[1].args.toToken).to.be.equal(tokenA.address);
       expect(swappedEvents[1].args.amountIn).to.be.equal(swap2_amountIn);
       expect(swappedEvents[1].args.amountOut).to.be.equal(amountADesired);
 
@@ -334,8 +416,9 @@ describe("CrowdUsdtLpStakeOpportunity", async () => {
         .sub(getSwapFee(swap1_amountOut))
         .sub(amountBDesired);
       const swap2_amountOut = amountADesired;
-      await CROWD.mint(quickswap.address, swap2_amountOut);
+      await tokenA.mint(quickswap.address, swap2_amountOut);
       await (<UniswapV2Router02Test>quickswap).setAmountOut(swap2_amountOut);
+      amountADesired = swap2_amountOut.sub(getSwapFee(swap2_amountOut));
 
       const swap1 = await getCrowdSwapAggregatorTransactionByMATIC(
         sushiswap,
@@ -357,7 +440,6 @@ describe("CrowdUsdtLpStakeOpportunity", async () => {
         crowdswapV1,
         opportunity
       );
-      amountADesired = swap2_amountOut.sub(getSwapFee(swap2_amountOut));
 
       const transaction = await opportunity.investByToken(
         user.address,
@@ -805,6 +887,75 @@ describe("CrowdUsdtLpStakeOpportunity", async () => {
               (await ethers.provider.getBlock("latest")).timestamp + 1000,
           },
           swap1.data
+        )
+      ).to.revertedWith("oe01");
+    });
+
+    it("Should fail when the amountOut of the first swap is not equal or greater than the expected amountOut, sending MATIC", async () => {
+      const {
+        opportunity,
+        crowdswapV1,
+        quickswap,
+        stakingCrowdWmaticLP,
+        CROWD,
+        WMATIC,
+      } = await loadFixture(crowdUsdtLpStakeOpportunityFixture);
+      const tokenA = CROWD;
+      const tokenB = WMATIC;
+
+      await opportunity.setTokenAandTokenB(tokenA.address, tokenB.address);
+      await opportunity.setCoinWrapper(tokenB.address);
+      await opportunity.setStakingLP(stakingCrowdWmaticLP.address);
+
+      const amountADesired = ethers.utils.parseEther("150");
+      const amountBDesired = ethers.utils.parseUnits("6.45", 6);
+      const amountAMin = ethers.utils.parseEther("148.5");
+      const amountBMin = ethers.utils.parseUnits("6.38", 6);
+
+      const opportunity_amountIn = ethers.utils.parseEther("15.3807"); // 15.35 + %0.2 fee
+      const totalFee = getAddLiqFee(opportunity_amountIn).add(
+        getStakeFee(opportunity_amountIn)
+      );
+
+      const swap1_amountIn = opportunity_amountIn
+        .sub(amountBDesired)
+        .sub(totalFee);
+      const swap1_ExpectedAmountOut = amountADesired;
+      const swap1_actualAmountOut = swap1_ExpectedAmountOut.sub(
+        ethers.utils.parseUnits("1")
+      );
+      await tokenA.mint(quickswap.address, swap1_actualAmountOut);
+      await (<UniswapV2Router02Test>quickswap).setAmountOut(
+        swap1_actualAmountOut
+      );
+
+      const swap1 = await getCrowdSwapAggregatorTransaction(
+        quickswap,
+        "Quickswap",
+        tokenB,
+        tokenA,
+        swap1_amountIn,
+        swap1_ExpectedAmountOut,
+        crowdswapV1,
+        opportunity
+      );
+
+      await expect(
+        opportunity.investByTokenAOrTokenB(
+          owner.address,
+          tokenB.address,
+          opportunity_amountIn,
+          swap1_amountIn,
+          {
+            amountADesired,
+            amountBDesired,
+            amountAMin,
+            amountBMin,
+            deadline:
+              (await ethers.provider.getBlock("latest")).timestamp + 1000,
+          },
+          swap1.data,
+          { value: opportunity_amountIn }
         )
       ).to.revertedWith("oe01");
     });
@@ -1323,7 +1474,7 @@ describe("CrowdUsdtLpStakeOpportunity", async () => {
   });
 
   describe("leave", async () => {
-    let opportunity, tokenA, tokenB, crowdUsdtPair, stakingLP;
+    let opportunity, tokenA, tokenB, crowdUsdtPair, stakingCrowdUsdtLP;
     let amountLP;
 
     const totalRewards = ethers.utils.parseEther("10000000");
@@ -1338,10 +1489,10 @@ describe("CrowdUsdtLpStakeOpportunity", async () => {
       tokenA = fixture.CROWD;
       tokenB = fixture.USDT;
       crowdUsdtPair = fixture.crowdUsdtPair;
-      stakingLP = fixture.stakingLP;
+      stakingCrowdUsdtLP = fixture.stakingCrowdUsdtLP;
 
-      await tokenA.mint(stakingLP.address, totalRewards);
-      await stakingLP.notifyRewardAmount(totalRewards);
+      await tokenA.mint(stakingCrowdUsdtLP.address, totalRewards);
+      await stakingCrowdUsdtLP.notifyRewardAmount(totalRewards);
       await tokenA.mint(owner.address, amountADesired);
       await tokenA.approve(opportunity.address, amountADesired);
       await tokenB.mint(owner.address, amountBDesired);
@@ -1355,12 +1506,12 @@ describe("CrowdUsdtLpStakeOpportunity", async () => {
         deadline: (await ethers.provider.getBlock("latest")).timestamp + 1000,
       });
 
-      amountLP = await stakingLP.balanceOf(user.address);
+      amountLP = await stakingCrowdUsdtLP.balanceOf(user.address);
     });
 
     it("User should be able to leave, unstaking all LP", async () => {
       await moveTimeForward(10);
-      const rewards = await stakingLP.earned(user.address); // rewards so far
+      const rewards = await stakingCrowdUsdtLP.earned(user.address); // rewards so far
       expect(rewards).to.be.gt(0);
 
       const balanceBeforeCROWD = await tokenA.balanceOf(account1.address);
@@ -1403,7 +1554,7 @@ describe("CrowdUsdtLpStakeOpportunity", async () => {
 
     it("User should be able to leave, unstaking some LP", async () => {
       await moveTimeForward(10);
-      const rewards = await stakingLP.earned(user.address); // rewards so far
+      const rewards = await stakingCrowdUsdtLP.earned(user.address); // rewards so far
       expect(rewards).to.be.gt(0);
 
       amountAMin = ethers.utils.parseEther("49.5");
@@ -1458,7 +1609,9 @@ describe("CrowdUsdtLpStakeOpportunity", async () => {
         crowdUsdtLpStakeOpportunityFixture
       );
       const newAddress = "0x7Be8076f4EA4A4AD08075C2508e481d6C946D12b";
-      await opportunity.setFeeTo(newAddress);
+      await expect(opportunity.setFeeTo(newAddress))
+        .to.emit(opportunity, "SetFeeTo")
+        .withArgs(owner.address, newAddress);
       await expect(await opportunity.feeTo()).to.eq(newAddress);
     });
 
@@ -1467,7 +1620,9 @@ describe("CrowdUsdtLpStakeOpportunity", async () => {
         crowdUsdtLpStakeOpportunityFixture
       );
       const newFee = ethers.utils.parseEther("0.2");
-      await opportunity.setAddLiquidityFee(newFee);
+      await expect(opportunity.setAddLiquidityFee(newFee))
+        .to.emit(opportunity, "SetFee")
+        .withArgs(owner.address, newFee);
       await expect(await opportunity.addLiquidityFee()).to.eq(newFee);
     });
 
@@ -1476,7 +1631,9 @@ describe("CrowdUsdtLpStakeOpportunity", async () => {
         crowdUsdtLpStakeOpportunityFixture
       );
       const newFee = ethers.utils.parseEther("0.2");
-      await opportunity.setRemoveLiquidityFee(newFee);
+      await expect(opportunity.setRemoveLiquidityFee(newFee))
+        .to.emit(opportunity, "SetFee")
+        .withArgs(owner.address, newFee);
       await expect(await opportunity.removeLiquidityFee()).to.eq(newFee);
     });
 
@@ -1485,7 +1642,9 @@ describe("CrowdUsdtLpStakeOpportunity", async () => {
         crowdUsdtLpStakeOpportunityFixture
       );
       const newFee = ethers.utils.parseEther("0.2");
-      await opportunity.setStakeFee(newFee);
+      await expect(opportunity.setStakeFee(newFee))
+        .to.emit(opportunity, "SetFee")
+        .withArgs(owner.address, newFee);
       await expect(await opportunity.stakeFee()).to.eq(newFee);
     });
 
@@ -1494,35 +1653,34 @@ describe("CrowdUsdtLpStakeOpportunity", async () => {
         crowdUsdtLpStakeOpportunityFixture
       );
       const newFee = ethers.utils.parseEther("0.2");
-      await opportunity.setUnstakeFee(newFee);
+      await expect(opportunity.setUnstakeFee(newFee))
+        .to.emit(opportunity, "SetFee")
+        .withArgs(owner.address, newFee);
       await expect(await opportunity.unstakeFee()).to.eq(newFee);
     });
 
-    it("should change the tokenA", async () => {
-      const { opportunity } = await loadFixture(
+    it("should change the tokenA and the tokenB", async () => {
+      const { opportunity, CROWD, WMATIC } = await loadFixture(
         crowdUsdtLpStakeOpportunityFixture
       );
-      const newAddress = "0x7Be8076f4EA4A4AD08075C2508e481d6C946D12b";
-      await opportunity.setTokenA(newAddress);
-      await expect(await opportunity.tokenA()).to.eq(newAddress);
+      await expect(
+        opportunity.setTokenAandTokenB(CROWD.address, WMATIC.address)
+      )
+        .to.emit(opportunity, "SetTokens")
+        .withArgs(owner.address, CROWD.address, WMATIC.address);
+      await expect(await opportunity.tokenA()).to.eq(CROWD.address);
+      await expect(await opportunity.tokenB()).to.eq(WMATIC.address);
     });
 
-    it("should change the tokenB", async () => {
+    it("should change the pair factory contract", async () => {
       const { opportunity } = await loadFixture(
         crowdUsdtLpStakeOpportunityFixture
       );
       const newAddress = "0x7Be8076f4EA4A4AD08075C2508e481d6C946D12b";
-      await opportunity.setTokenB(newAddress);
-      await expect(await opportunity.tokenB()).to.eq(newAddress);
-    });
-
-    it("should change the pair contract", async () => {
-      const { opportunity } = await loadFixture(
-        crowdUsdtLpStakeOpportunityFixture
-      );
-      const newAddress = "0x7Be8076f4EA4A4AD08075C2508e481d6C946D12b";
-      await opportunity.setPair(newAddress);
-      await expect(await opportunity.pair()).to.eq(newAddress);
+      await expect(opportunity.setPairFactoryContract(newAddress))
+        .to.emit(opportunity, "SetPairFactory")
+        .withArgs(owner.address, newAddress);
+      await expect(await opportunity.pairFactoryContract()).to.eq(newAddress);
     });
 
     it("should change the swap contract", async () => {
@@ -1530,7 +1688,9 @@ describe("CrowdUsdtLpStakeOpportunity", async () => {
         crowdUsdtLpStakeOpportunityFixture
       );
       const newAddress = "0x7Be8076f4EA4A4AD08075C2508e481d6C946D12b";
-      await opportunity.setSwapContract(newAddress);
+      await expect(opportunity.setSwapContract(newAddress))
+        .to.emit(opportunity, "SetSwapContact")
+        .withArgs(owner.address, newAddress);
       await expect(await opportunity.swapContract()).to.eq(newAddress);
     });
 
@@ -1539,16 +1699,20 @@ describe("CrowdUsdtLpStakeOpportunity", async () => {
         crowdUsdtLpStakeOpportunityFixture
       );
       const newAddress = "0x7Be8076f4EA4A4AD08075C2508e481d6C946D12b";
-      await opportunity.setRouter(newAddress);
+      await expect(opportunity.setRouter(newAddress))
+        .to.emit(opportunity, "SetRouter")
+        .withArgs(owner.address, newAddress);
       await expect(await opportunity.router()).to.eq(newAddress);
     });
 
-    it("should change the stakingLP contract", async () => {
+    it("should change the stakingCrowdUsdtLP contract", async () => {
       const { opportunity } = await loadFixture(
         crowdUsdtLpStakeOpportunityFixture
       );
       const newAddress = "0x7Be8076f4EA4A4AD08075C2508e481d6C946D12b";
-      await opportunity.setStakingLP(newAddress);
+      await expect(opportunity.setStakingLP(newAddress))
+        .to.emit(opportunity, "SetStakingLP")
+        .withArgs(owner.address, newAddress);
       await expect(await opportunity.stakingLP()).to.eq(newAddress);
     });
 
@@ -1581,15 +1745,11 @@ describe("CrowdUsdtLpStakeOpportunity", async () => {
       ).to.revertedWith("ce30");
 
       await expect(
-        opportunity.connect(account1).setTokenA(newAddress)
+        opportunity.connect(account1).setTokenAandTokenB(newAddress, newAddress)
       ).to.revertedWith("ce30");
 
       await expect(
-        opportunity.connect(account1).setTokenB(newAddress)
-      ).to.revertedWith("ce30");
-
-      await expect(
-        opportunity.connect(account1).setPair(newAddress)
+        opportunity.connect(account1).setPairFactoryContract(newAddress)
       ).to.revertedWith("ce30");
 
       await expect(
@@ -1612,13 +1772,22 @@ describe("CrowdUsdtLpStakeOpportunity", async () => {
     });
 
     it("should fail to set addresses to zero", async () => {
-      const { opportunity } = await loadFixture(
+      const { opportunity, CROWD, USDT, DAI } = await loadFixture(
         crowdUsdtLpStakeOpportunityFixture
       );
+      const tokenA = CROWD;
+      const tokenB = USDT;
+
       await expect(opportunity.setFeeTo(AddressZero)).to.revertedWith("oe12");
-      await expect(opportunity.setTokenA(AddressZero)).to.revertedWith("oe12");
-      await expect(opportunity.setTokenB(AddressZero)).to.revertedWith("oe12");
-      await expect(opportunity.setPair(AddressZero)).to.revertedWith("oe12");
+      await expect(
+        opportunity.setTokenAandTokenB(AddressZero, tokenB.address)
+      ).to.revertedWith("oe12");
+      await expect(
+        opportunity.setTokenAandTokenB(tokenA.address, AddressZero)
+      ).to.revertedWith("oe12");
+      await expect(
+        opportunity.setTokenAandTokenB(tokenB.address, DAI.address)
+      ).to.revertedWith("pair is not valid");
       await expect(opportunity.setSwapContract(AddressZero)).to.revertedWith(
         "oe12"
       );

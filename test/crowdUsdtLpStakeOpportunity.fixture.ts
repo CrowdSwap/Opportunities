@@ -11,6 +11,8 @@ import {
   StakingLP__factory,
   UniswapV2FactoryTest__factory,
   UniswapV2Router02Test__factory,
+  IWETH,
+  WETH__factory,
 } from "../artifacts/types";
 import { ethers, upgrades } from "hardhat";
 import { Address } from "ethereumjs-util";
@@ -20,6 +22,7 @@ const tokenFixture: Fixture<{
   CROWD: ERC20PresetMinterPauser;
   USDT: ERC20PresetMinterPauser;
   DAI: ERC20PresetMinterPauser;
+  WMATIC: IWETH;
   MATIC: Address;
 }> = async ([wallet], provider) => {
   const signer = provider.getSigner(wallet.address);
@@ -36,6 +39,7 @@ const tokenFixture: Fixture<{
       "DAI minter",
       "DAI"
     ),
+    WMATIC: await new WETH__factory(signer).deploy(),
     MATIC: Address.fromString("0x0000000000000000000000000000000000001010"),
   };
 };
@@ -45,18 +49,25 @@ export const crowdUsdtLpStakeOpportunityFixture: Fixture<{
   crowdswapV1: CrowdswapV1Test;
   sushiswap: IUniswapV2Router02;
   quickswap: IUniswapV2Router02;
-  stakingLP: Contract;
+  stakingCrowdUsdtLP: Contract;
+  stakingCrowdWmaticLP: Contract;
   CROWD: ERC20PresetMinterPauser;
   USDT: ERC20PresetMinterPauser;
   DAI: ERC20PresetMinterPauser;
+  WMATIC: IWETH;
   MATIC: Address;
   crowdUsdtPair: IUniswapV2PairTest;
+  crowdWmaticPair: IUniswapV2PairTest;
 }> = async ([wallet, revenue], provider) => {
   const signer = provider.getSigner(wallet.address);
 
-  const { CROWD, USDT, DAI, MATIC } = await tokenFixture([wallet], provider);
+  const { CROWD, USDT, DAI, WMATIC, MATIC } = await tokenFixture(
+    [wallet],
+    provider
+  );
 
   const factory = await new UniswapV2FactoryTest__factory(signer).deploy();
+
   await factory.createPair(CROWD.address, USDT.address);
   const crowdUsdtPairAddress = await factory.getPair(
     CROWD.address,
@@ -66,12 +77,23 @@ export const crowdUsdtLpStakeOpportunityFixture: Fixture<{
     crowdUsdtPairAddress,
     wallet
   );
+  await factory.createPair(CROWD.address, WMATIC.address);
+  const crowdWmaticPairAddress = await factory.getPair(
+    CROWD.address,
+    WMATIC.address
+  );
+  const crowdWmaticPair = IUniswapV2PairTest__factory.connect(
+    crowdWmaticPairAddress,
+    wallet
+  );
 
   const sushiswap = await new UniswapV2Router02Test__factory(signer).deploy(
-    factory.address
+    factory.address,
+    WMATIC.address
   );
   const quickswap = await new UniswapV2Router02Test__factory(signer).deploy(
-    factory.address
+    factory.address,
+    WMATIC.address
   );
   const crowdswapV1 = await new CrowdswapV1Test__factory(signer).deploy([
     { flag: 0x03, adr: sushiswap.address },
@@ -80,10 +102,22 @@ export const crowdUsdtLpStakeOpportunityFixture: Fixture<{
 
   let currentTimestamp = await ethers.provider.getBlock("latest");
   const crowdUsdtLpStakingFactory = new StakingLP__factory(signer);
-  const stakingLP = await upgrades.deployProxy(
+  const stakingCrowdUsdtLP = await upgrades.deployProxy(
     crowdUsdtLpStakingFactory,
     [
       crowdUsdtPairAddress,
+      CROWD.address,
+      200 * 24 * 3600,
+      BigNumber.from(currentTimestamp.timestamp),
+    ],
+    {
+      kind: "uups",
+    }
+  );
+  const stakingCrowdWmaticLP = await upgrades.deployProxy(
+    crowdUsdtLpStakingFactory,
+    [
+      crowdWmaticPairAddress,
       CROWD.address,
       200 * 24 * 3600,
       BigNumber.from(currentTimestamp.timestamp),
@@ -102,7 +136,7 @@ export const crowdUsdtLpStakeOpportunityFixture: Fixture<{
     [
       CROWD.address,
       USDT.address,
-      crowdUsdtPairAddress,
+      factory.address,
       revenue.address,
       fee,
       fee,
@@ -110,14 +144,18 @@ export const crowdUsdtLpStakeOpportunityFixture: Fixture<{
       fee,
       crowdswapV1.address,
       quickswap.address,
-      stakingLP.address,
+      stakingCrowdUsdtLP.address,
     ],
     {
       kind: "uups",
     }
   );
-  await stakingLP.setOpportunityContract(opportunity.address);
-  await stakingLP.setResonateAdapter(
+  await stakingCrowdUsdtLP.setOpportunityContract(opportunity.address);
+  await stakingCrowdUsdtLP.setResonateAdapter(
+    "0x127F6e566212d3477b34725C9D1a422d6D960c97"
+  );
+  await stakingCrowdWmaticLP.setOpportunityContract(opportunity.address);
+  await stakingCrowdWmaticLP.setResonateAdapter(
     "0x127F6e566212d3477b34725C9D1a422d6D960c97"
   );
 
@@ -126,11 +164,14 @@ export const crowdUsdtLpStakeOpportunityFixture: Fixture<{
     crowdswapV1,
     sushiswap,
     quickswap,
-    stakingLP,
+    stakingCrowdUsdtLP,
+    stakingCrowdWmaticLP,
     CROWD,
     USDT,
     DAI,
+    WMATIC,
     MATIC,
     crowdUsdtPair,
+    crowdWmaticPair,
   };
 };

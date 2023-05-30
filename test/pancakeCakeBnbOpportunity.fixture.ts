@@ -12,6 +12,8 @@ import {
   IUniswapV2Router02,
   PancakeMasterChefV2Test__factory,
   PancakeMasterChefV2Test,
+  IWETH,
+  WETH__factory,
 } from "../artifacts/types";
 import { ethers, upgrades } from "hardhat";
 import { Address } from "ethereumjs-util";
@@ -23,7 +25,7 @@ const tokenFixture: Fixture<{
   CAKE: ERC20PresetMinterPauser;
   DAI: ERC20PresetMinterPauser;
   USDT: ERC20PresetMinterPauser;
-  WBNB: ERC20PresetMinterPauser;
+  WBNB: IWETH;
   BNB: Address;
 }> = async ([wallet], provider) => {
   const signer = provider.getSigner(wallet.address);
@@ -32,10 +34,7 @@ const tokenFixture: Fixture<{
       "CAKE minter",
       "CAKE"
     ),
-    WBNB: await new ERC20PresetMinterPauser__factory(signer).deploy(
-      "WBNB minter",
-      "WBNB"
-    ),
+    WBNB: await new WETH__factory(signer).deploy(),
     BUSD: await new ERC20PresetMinterPauser__factory(signer).deploy(
       "BUSD minter",
       "BUSD"
@@ -65,7 +64,7 @@ export const pancakeOpportunitiesFixture: Fixture<{
   CAKE: ERC20PresetMinterPauser;
   DAI: ERC20PresetMinterPauser;
   USDT: ERC20PresetMinterPauser;
-  WBNB: ERC20PresetMinterPauser;
+  WBNB: IWETH;
   BNB: Address;
   cakeWbnbPair: IUniswapV2PairTest;
   cakeUsdtPair: IUniswapV2PairTest;
@@ -107,10 +106,12 @@ export const pancakeOpportunitiesFixture: Fixture<{
   );
 
   const sushiswap = await new UniswapV2Router02Test__factory(signer).deploy(
-    factory.address
+    factory.address,
+    WBNB.address
   );
   const pancake = await new UniswapV2Router02Test__factory(signer).deploy(
-    factory.address
+    factory.address,
+    WBNB.address
   );
   const crowdswapV1 = await new CrowdswapV1Test__factory(signer).deploy([
     { flag: 0x03, adr: sushiswap.address },
@@ -165,7 +166,7 @@ export const pancakeOpportunitiesFixture: Fixture<{
       CAKE.address,
       WBNB.address,
       CAKE.address,
-      cakeWbnbPair.address,
+      factory.address,
       {
         feeTo: revenue.address,
         addLiquidityFee: fee,
@@ -183,73 +184,73 @@ export const pancakeOpportunitiesFixture: Fixture<{
     }
   );
   const cakeUsdtOpportunity = await upgrades.deployProxy(
-      pancakeOpportunityFactory,
-      [
-        CAKE.address,
-        USDT.address,
-        CAKE.address,
-        cakeUsdtPair.address,
-        {
-          feeTo: revenue.address,
-          addLiquidityFee: fee,
-          removeLiquidityFee: fee,
-          stakeFee: fee,
-          unstakeFee: fee,
-        },
-        crowdswapV1.address,
-        pancake.address,
-        pancakeMasterChefV2Test.address,
-        47,
-      ],
+    pancakeOpportunityFactory,
+    [
+      CAKE.address,
+      USDT.address,
+      CAKE.address,
+      factory.address,
       {
-        kind: "uups",
-      }
+        feeTo: revenue.address,
+        addLiquidityFee: fee,
+        removeLiquidityFee: fee,
+        stakeFee: fee,
+        unstakeFee: fee,
+      },
+      crowdswapV1.address,
+      pancake.address,
+      pancakeMasterChefV2Test.address,
+      47,
+    ],
+    {
+      kind: "uups",
+    }
   );
   const cakeBusdOpportunity = await upgrades.deployProxy(
-      pancakeOpportunityFactory,
-      [
-        CAKE.address,
-        BUSD.address,
-        CAKE.address,
-        cakeBusdPair.address,
-        {
-          feeTo: revenue.address,
-          addLiquidityFee: fee,
-          removeLiquidityFee: fee,
-          stakeFee: fee,
-          unstakeFee: fee,
-        },
-        crowdswapV1.address,
-        pancake.address,
-        pancakeMasterChefV2Test.address,
-        39,
-      ],
+    pancakeOpportunityFactory,
+    [
+      CAKE.address,
+      BUSD.address,
+      CAKE.address,
+      factory.address,
       {
-        kind: "uups",
-      }
+        feeTo: revenue.address,
+        addLiquidityFee: fee,
+        removeLiquidityFee: fee,
+        stakeFee: fee,
+        unstakeFee: fee,
+      },
+      crowdswapV1.address,
+      pancake.address,
+      pancakeMasterChefV2Test.address,
+      39,
+    ],
+    {
+      kind: "uups",
+    }
   );
   const busdWbnbOpportunity = await upgrades.deployProxy(
-      pancakeOpportunityFactory,
-      [
-        WBNB.address,
-        BUSD.address,
-        CAKE.address,
-        busdWbnbPair.address,
-        {
-          feeTo: revenue.address,
-          addLiquidityFee: fee,
-          removeLiquidityFee: fee,
-          stakeFee: fee,
-          unstakeFee: fee,
-        },
-        crowdswapV1.address,
-        pancake.address,
-        pancakeMasterChefV2Test.address,
-        3,
-      ],
+    pancakeOpportunityFactory,
+    [
+      WBNB.address,
+      BUSD.address,
+      CAKE.address,
+      factory.address,
       {
-        kind: "uups",
-      }
+        feeTo: revenue.address,
+        addLiquidityFee: fee,
+        removeLiquidityFee: fee,
+        stakeFee: fee,
+        unstakeFee: fee,
+      },
+      crowdswapV1.address,
+      pancake.address,
+      pancakeMasterChefV2Test.address,
+      3,
+    ],
+    {
+      kind: "uups",
+    }
   );
 
   return {

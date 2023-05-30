@@ -1737,7 +1737,9 @@ describe("PancakeCakeBnbOpportunity", async () => {
         pancakeOpportunitiesFixture
       );
       const newAddress = "0x7Be8076f4EA4A4AD08075C2508e481d6C946D12b";
-      await cakeWbnbOpportunity.setFeeTo(newAddress);
+      await expect(cakeWbnbOpportunity.setFeeTo(newAddress))
+        .to.emit(cakeWbnbOpportunity, "SetFeeTo")
+        .withArgs(owner.address, newAddress);
       await expect(await cakeWbnbOpportunity.feeTo()).to.eq(newAddress);
     });
 
@@ -1746,7 +1748,9 @@ describe("PancakeCakeBnbOpportunity", async () => {
         pancakeOpportunitiesFixture
       );
       const newFee = ethers.utils.parseEther("0.2");
-      await cakeWbnbOpportunity.setAddLiquidityFee(newFee);
+      await expect(cakeWbnbOpportunity.setAddLiquidityFee(newFee))
+        .to.emit(cakeWbnbOpportunity, "SetFee")
+        .withArgs(owner.address, newFee);
       await expect(await cakeWbnbOpportunity.addLiquidityFee()).to.eq(newFee);
     });
 
@@ -1755,7 +1759,9 @@ describe("PancakeCakeBnbOpportunity", async () => {
         pancakeOpportunitiesFixture
       );
       const newFee = ethers.utils.parseEther("0.2");
-      await cakeWbnbOpportunity.setRemoveLiquidityFee(newFee);
+      await expect(cakeWbnbOpportunity.setRemoveLiquidityFee(newFee))
+        .to.emit(cakeWbnbOpportunity, "SetFee")
+        .withArgs(owner.address, newFee);
       await expect(await cakeWbnbOpportunity.removeLiquidityFee()).to.eq(
         newFee
       );
@@ -1766,7 +1772,9 @@ describe("PancakeCakeBnbOpportunity", async () => {
         pancakeOpportunitiesFixture
       );
       const newFee = ethers.utils.parseEther("0.2");
-      await cakeWbnbOpportunity.setStakeFee(newFee);
+      await expect(cakeWbnbOpportunity.setStakeFee(newFee))
+        .to.emit(cakeWbnbOpportunity, "SetFee")
+        .withArgs(owner.address, newFee);
       await expect(await cakeWbnbOpportunity.stakeFee()).to.eq(newFee);
     });
 
@@ -1775,35 +1783,37 @@ describe("PancakeCakeBnbOpportunity", async () => {
         pancakeOpportunitiesFixture
       );
       const newFee = ethers.utils.parseEther("0.2");
-      await cakeWbnbOpportunity.setUnstakeFee(newFee);
+      await expect(cakeWbnbOpportunity.setUnstakeFee(newFee))
+        .to.emit(cakeWbnbOpportunity, "SetFee")
+        .withArgs(owner.address, newFee);
       await expect(await cakeWbnbOpportunity.unstakeFee()).to.eq(newFee);
     });
 
-    it("should change the tokenA", async () => {
-      const { cakeWbnbOpportunity } = await loadFixture(
+    it("should change the tokenA and the tokenB", async () => {
+      const { cakeWbnbOpportunity, BUSD, WBNB } = await loadFixture(
         pancakeOpportunitiesFixture
       );
       const newAddress = "0x7Be8076f4EA4A4AD08075C2508e481d6C946D12b";
-      await cakeWbnbOpportunity.setTokenA(newAddress);
-      await expect(await cakeWbnbOpportunity.tokenA()).to.eq(newAddress);
+      await expect(
+        cakeWbnbOpportunity.setTokenAandTokenB(BUSD.address, WBNB.address)
+      )
+        .to.emit(cakeWbnbOpportunity, "SetTokens")
+        .withArgs(owner.address, BUSD.address, WBNB.address);
+      await expect(await cakeWbnbOpportunity.tokenA()).to.eq(BUSD.address);
+      await expect(await cakeWbnbOpportunity.tokenB()).to.eq(WBNB.address);
     });
 
-    it("should change the tokenB", async () => {
+    it("should change the pair factory contract", async () => {
       const { cakeWbnbOpportunity } = await loadFixture(
         pancakeOpportunitiesFixture
       );
       const newAddress = "0x7Be8076f4EA4A4AD08075C2508e481d6C946D12b";
-      await cakeWbnbOpportunity.setTokenB(newAddress);
-      await expect(await cakeWbnbOpportunity.tokenB()).to.eq(newAddress);
-    });
-
-    it("should change the pair contract", async () => {
-      const { cakeWbnbOpportunity } = await loadFixture(
-        pancakeOpportunitiesFixture
+      await expect(cakeWbnbOpportunity.setPairFactoryContract(newAddress))
+        .to.emit(cakeWbnbOpportunity, "SetPairFactory")
+        .withArgs(owner.address, newAddress);
+      await expect(await cakeWbnbOpportunity.pairFactoryContract()).to.eq(
+        newAddress
       );
-      const newAddress = "0x7Be8076f4EA4A4AD08075C2508e481d6C946D12b";
-      await cakeWbnbOpportunity.setPair(newAddress);
-      await expect(await cakeWbnbOpportunity.pair()).to.eq(newAddress);
     });
 
     it("should change the swap contract", async () => {
@@ -1811,7 +1821,9 @@ describe("PancakeCakeBnbOpportunity", async () => {
         pancakeOpportunitiesFixture
       );
       const newAddress = "0x7Be8076f4EA4A4AD08075C2508e481d6C946D12b";
-      await cakeWbnbOpportunity.setSwapContract(newAddress);
+      await expect(cakeWbnbOpportunity.setSwapContract(newAddress))
+        .to.emit(cakeWbnbOpportunity, "SetSwapContact")
+        .withArgs(owner.address, newAddress);
       await expect(await cakeWbnbOpportunity.swapContract()).to.eq(newAddress);
     });
 
@@ -1820,7 +1832,9 @@ describe("PancakeCakeBnbOpportunity", async () => {
         pancakeOpportunitiesFixture
       );
       const newAddress = "0x7Be8076f4EA4A4AD08075C2508e481d6C946D12b";
-      await cakeWbnbOpportunity.setRouter(newAddress);
+      await expect(cakeWbnbOpportunity.setRouter(newAddress))
+        .to.emit(cakeWbnbOpportunity, "SetRouter")
+        .withArgs(owner.address, newAddress);
       await expect(await cakeWbnbOpportunity.router()).to.eq(newAddress);
     });
 
@@ -1829,7 +1843,9 @@ describe("PancakeCakeBnbOpportunity", async () => {
         pancakeOpportunitiesFixture
       );
       const newAddress = "0x7Be8076f4EA4A4AD08075C2508e481d6C946D12b";
-      await cakeWbnbOpportunity.setMasterChefV2(newAddress);
+      await expect(cakeWbnbOpportunity.setMasterChefV2(newAddress))
+        .to.emit(cakeWbnbOpportunity, "SetMasterChef")
+        .withArgs(owner.address, newAddress);
       await expect(await cakeWbnbOpportunity.pancakeMasterChefV2()).to.eq(
         newAddress
       );
@@ -1864,15 +1880,13 @@ describe("PancakeCakeBnbOpportunity", async () => {
       ).to.revertedWith("ce30");
 
       await expect(
-        cakeWbnbOpportunity.connect(account1).setTokenA(newAddress)
+        cakeWbnbOpportunity
+          .connect(account1)
+          .setTokenAandTokenB(newAddress, newAddress)
       ).to.revertedWith("ce30");
 
       await expect(
-        cakeWbnbOpportunity.connect(account1).setTokenB(newAddress)
-      ).to.revertedWith("ce30");
-
-      await expect(
-        cakeWbnbOpportunity.connect(account1).setPair(newAddress)
+        cakeWbnbOpportunity.connect(account1).setPairFactoryContract(newAddress)
       ).to.revertedWith("ce30");
 
       await expect(
@@ -1895,21 +1909,24 @@ describe("PancakeCakeBnbOpportunity", async () => {
     });
 
     it("should fail to set addresses to zero", async () => {
-      const { cakeWbnbOpportunity } = await loadFixture(
+      const { cakeWbnbOpportunity, CAKE, WBNB, DAI } = await loadFixture(
         pancakeOpportunitiesFixture
       );
+      const tokenA = CAKE;
+      const tokenB = WBNB;
+
       await expect(cakeWbnbOpportunity.setFeeTo(AddressZero)).to.revertedWith(
         "oe12"
       );
-      await expect(cakeWbnbOpportunity.setTokenA(AddressZero)).to.revertedWith(
-        "oe12"
-      );
-      await expect(cakeWbnbOpportunity.setTokenB(AddressZero)).to.revertedWith(
-        "oe12"
-      );
-      await expect(cakeWbnbOpportunity.setPair(AddressZero)).to.revertedWith(
-        "oe12"
-      );
+      await expect(
+        cakeWbnbOpportunity.setTokenAandTokenB(AddressZero, tokenB.address)
+      ).to.revertedWith("oe12");
+      await expect(
+        cakeWbnbOpportunity.setTokenAandTokenB(tokenA.address, AddressZero)
+      ).to.revertedWith("oe12");
+      await expect(
+        cakeWbnbOpportunity.setTokenAandTokenB(tokenB.address, DAI.address)
+      ).to.revertedWith("pair is not valid");
       await expect(
         cakeWbnbOpportunity.setSwapContract(AddressZero)
       ).to.revertedWith("oe12");

@@ -12,6 +12,8 @@ import {
   IUniswapV2PairTest,
   IUniswapV2PairTest__factory,
   BeefyVaultV6Test,
+  IWETH,
+  WETH__factory,
 } from "../artifacts/types";
 import { ethers, upgrades } from "hardhat";
 import { Address } from "ethereumjs-util";
@@ -21,6 +23,7 @@ const tokenFixture: Fixture<{
   MIMATIC: ERC20PresetMinterPauser;
   USDC: ERC20PresetMinterPauser;
   DAI: ERC20PresetMinterPauser;
+  WMATIC: IWETH;
   MATIC: Address;
 }> = async ([wallet], provider) => {
   const signer = provider.getSigner(wallet.address);
@@ -37,6 +40,7 @@ const tokenFixture: Fixture<{
       "DAI minter",
       "DAI"
     ),
+    WMATIC: await new WETH__factory(signer).deploy(),
     MATIC: Address.fromString("0x0000000000000000000000000000000000001010"),
   };
 };
@@ -55,7 +59,10 @@ export const beefyMimaticUsdcOpportunityFixture: Fixture<{
 }> = async ([wallet, revenue], provider) => {
   const signer = provider.getSigner(wallet.address);
 
-  const { MIMATIC, USDC, DAI, MATIC } = await tokenFixture([wallet], provider);
+  const { MIMATIC, USDC, DAI, MATIC, WMATIC } = await tokenFixture(
+    [wallet],
+    provider
+  );
 
   const factory = await new UniswapV2FactoryTest__factory(signer).deploy();
   await factory.createPair(MIMATIC.address, USDC.address);
@@ -69,10 +76,12 @@ export const beefyMimaticUsdcOpportunityFixture: Fixture<{
   );
 
   const sushiswap = await new UniswapV2Router02Test__factory(signer).deploy(
-    factory.address
+    factory.address,
+    WMATIC.address
   );
   const quickswap = await new UniswapV2Router02Test__factory(signer).deploy(
-    factory.address
+    factory.address,
+    WMATIC.address
   );
   const crowdswapV1 = await new CrowdswapV1Test__factory(signer).deploy([
     { flag: 0x03, adr: sushiswap.address },
@@ -94,7 +103,7 @@ export const beefyMimaticUsdcOpportunityFixture: Fixture<{
     [
       MIMATIC.address,
       USDC.address,
-      mimaticUsdcPairAddress,
+      factory.address,
       revenue.address,
       fee,
       fee,
@@ -108,6 +117,8 @@ export const beefyMimaticUsdcOpportunityFixture: Fixture<{
       kind: "uups",
     }
   );
+
+  await factory.createPair(MIMATIC.address, DAI.address); //For testing setTokenAandTokenB function
 
   return {
     opportunity,

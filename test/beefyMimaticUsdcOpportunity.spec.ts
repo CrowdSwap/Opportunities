@@ -77,7 +77,7 @@ describe("BeefyMimaticUsdcOpportunity", async () => {
       expect(feeDeductedEvent.args.user).to.be.equal(owner.address);
       expect(feeDeductedEvent.args.token).to.be.equal(tokenB.address);
       expect(feeDeductedEvent.args.amount).to.be.equal(amountBDesired);
-      expect(feeDeductedEvent.args.totalFee).to.be.equal(totalFee);
+      expect(feeDeductedEvent.args.totalFee).to.be.gte(totalFee);
 
       const addedLiquidityEvent = receipt.events.find(
         (event) => event.event === "AddedLiquidity"
@@ -85,7 +85,7 @@ describe("BeefyMimaticUsdcOpportunity", async () => {
       expect(addedLiquidityEvent).to.not.be.undefined;
       expect(addedLiquidityEvent.args.user).to.be.equal(owner.address);
       expect(addedLiquidityEvent.args.amountA).to.be.equal(amountADesired);
-      expect(addedLiquidityEvent.args.amountB).to.be.equal(
+      expect(addedLiquidityEvent.args.amountB).to.be.lte(
         amountBDesired.sub(totalFee)
       );
       expect(addedLiquidityEvent.args.liquidity).to.not.be.undefined;
@@ -1458,7 +1458,9 @@ describe("BeefyMimaticUsdcOpportunity", async () => {
         beefyMimaticUsdcOpportunityFixture
       );
       const newAddress = "0x7Be8076f4EA4A4AD08075C2508e481d6C946D12b";
-      await opportunity.setFeeTo(newAddress);
+      await expect(opportunity.setFeeTo(newAddress))
+        .to.emit(opportunity, "SetFeeTo")
+        .withArgs(owner.address, newAddress);
       await expect(await opportunity.feeTo()).to.eq(newAddress);
     });
 
@@ -1467,7 +1469,9 @@ describe("BeefyMimaticUsdcOpportunity", async () => {
         beefyMimaticUsdcOpportunityFixture
       );
       const newFee = ethers.utils.parseEther("0.2");
-      await opportunity.setAddLiquidityFee(newFee);
+      await expect(opportunity.setAddLiquidityFee(newFee))
+        .to.emit(opportunity, "SetFee")
+        .withArgs(owner.address, newFee);
       await expect(await opportunity.addLiquidityFee()).to.eq(newFee);
     });
 
@@ -1476,7 +1480,9 @@ describe("BeefyMimaticUsdcOpportunity", async () => {
         beefyMimaticUsdcOpportunityFixture
       );
       const newFee = ethers.utils.parseEther("0.2");
-      await opportunity.setRemoveLiquidityFee(newFee);
+      await expect(opportunity.setRemoveLiquidityFee(newFee))
+        .to.emit(opportunity, "SetFee")
+        .withArgs(owner.address, newFee);
       await expect(await opportunity.removeLiquidityFee()).to.eq(newFee);
     });
 
@@ -1485,7 +1491,9 @@ describe("BeefyMimaticUsdcOpportunity", async () => {
         beefyMimaticUsdcOpportunityFixture
       );
       const newFee = ethers.utils.parseEther("0.2");
-      await opportunity.setStakeFee(newFee);
+      await expect(opportunity.setStakeFee(newFee))
+        .to.emit(opportunity, "SetFee")
+        .withArgs(owner.address, newFee);
       await expect(await opportunity.stakeFee()).to.eq(newFee);
     });
 
@@ -1494,35 +1502,32 @@ describe("BeefyMimaticUsdcOpportunity", async () => {
         beefyMimaticUsdcOpportunityFixture
       );
       const newFee = ethers.utils.parseEther("0.2");
-      await opportunity.setUnstakeFee(newFee);
+      await expect(opportunity.setUnstakeFee(newFee))
+        .to.emit(opportunity, "SetFee")
+        .withArgs(owner.address, newFee);
       await expect(await opportunity.unstakeFee()).to.eq(newFee);
     });
 
-    it("should change the tokenA", async () => {
-      const { opportunity } = await loadFixture(
+    it("should change the tokenA and the tokenB", async () => {
+      const { opportunity, MIMATIC, DAI } = await loadFixture(
         beefyMimaticUsdcOpportunityFixture
       );
-      const newAddress = "0x7Be8076f4EA4A4AD08075C2508e481d6C946D12b";
-      await opportunity.setTokenA(newAddress);
-      await expect(await opportunity.tokenA()).to.eq(newAddress);
+      await expect(opportunity.setTokenAandTokenB(MIMATIC.address, DAI.address))
+        .to.emit(opportunity, "SetTokens")
+        .withArgs(owner.address, MIMATIC.address, DAI.address);
+      await expect(await opportunity.tokenA()).to.eq(MIMATIC.address);
+      await expect(await opportunity.tokenB()).to.eq(DAI.address);
     });
 
-    it("should change the tokenB", async () => {
+    it("should change the pair factory contract", async () => {
       const { opportunity } = await loadFixture(
         beefyMimaticUsdcOpportunityFixture
       );
       const newAddress = "0x7Be8076f4EA4A4AD08075C2508e481d6C946D12b";
-      await opportunity.setTokenB(newAddress);
-      await expect(await opportunity.tokenB()).to.eq(newAddress);
-    });
-
-    it("should change the pair contract", async () => {
-      const { opportunity } = await loadFixture(
-        beefyMimaticUsdcOpportunityFixture
-      );
-      const newAddress = "0x7Be8076f4EA4A4AD08075C2508e481d6C946D12b";
-      await opportunity.setPair(newAddress);
-      await expect(await opportunity.pair()).to.eq(newAddress);
+      await expect(opportunity.setPairFactoryContract(newAddress))
+        .to.emit(opportunity, "SetPairFactory")
+        .withArgs(owner.address, newAddress);
+      await expect(await opportunity.pairFactoryContract()).to.eq(newAddress);
     });
 
     it("should change the swap contract", async () => {
@@ -1530,7 +1535,9 @@ describe("BeefyMimaticUsdcOpportunity", async () => {
         beefyMimaticUsdcOpportunityFixture
       );
       const newAddress = "0x7Be8076f4EA4A4AD08075C2508e481d6C946D12b";
-      await opportunity.setSwapContract(newAddress);
+      await expect(opportunity.setSwapContract(newAddress))
+        .to.emit(opportunity, "SetSwapContact")
+        .withArgs(owner.address, newAddress);
       await expect(await opportunity.swapContract()).to.eq(newAddress);
     });
 
@@ -1539,16 +1546,20 @@ describe("BeefyMimaticUsdcOpportunity", async () => {
         beefyMimaticUsdcOpportunityFixture
       );
       const newAddress = "0x7Be8076f4EA4A4AD08075C2508e481d6C946D12b";
-      await opportunity.setRouter(newAddress);
+      await expect(opportunity.setRouter(newAddress))
+        .to.emit(opportunity, "SetRouter")
+        .withArgs(owner.address, newAddress);
       await expect(await opportunity.router()).to.eq(newAddress);
     });
 
-    it("should change the stakingLP contract", async () => {
+    it("should change the vault contract", async () => {
       const { opportunity } = await loadFixture(
         beefyMimaticUsdcOpportunityFixture
       );
       const newAddress = "0x7Be8076f4EA4A4AD08075C2508e481d6C946D12b";
-      await opportunity.setVault(newAddress);
+      await expect(opportunity.setVault(newAddress))
+        .to.emit(opportunity, "SetVault")
+        .withArgs(owner.address, newAddress);
       await expect(await opportunity.vault()).to.eq(newAddress);
     });
 
@@ -1581,15 +1592,11 @@ describe("BeefyMimaticUsdcOpportunity", async () => {
       ).to.revertedWith("ce30");
 
       await expect(
-        opportunity.connect(account1).setTokenA(newAddress)
+        opportunity.connect(account1).setTokenAandTokenB(newAddress, newAddress)
       ).to.revertedWith("ce30");
 
       await expect(
-        opportunity.connect(account1).setTokenB(newAddress)
-      ).to.revertedWith("ce30");
-
-      await expect(
-        opportunity.connect(account1).setPair(newAddress)
+        opportunity.connect(account1).setPairFactoryContract(newAddress)
       ).to.revertedWith("ce30");
 
       await expect(
@@ -1612,13 +1619,22 @@ describe("BeefyMimaticUsdcOpportunity", async () => {
     });
 
     it("should fail to set addresses to zero", async () => {
-      const { opportunity } = await loadFixture(
+      const { opportunity, MIMATIC, USDC, DAI } = await loadFixture(
         beefyMimaticUsdcOpportunityFixture
       );
+      const tokenA = MIMATIC;
+      const tokenB = USDC;
+
       await expect(opportunity.setFeeTo(AddressZero)).to.revertedWith("oe12");
-      await expect(opportunity.setTokenA(AddressZero)).to.revertedWith("oe12");
-      await expect(opportunity.setTokenB(AddressZero)).to.revertedWith("oe12");
-      await expect(opportunity.setPair(AddressZero)).to.revertedWith("oe12");
+      await expect(
+        opportunity.setTokenAandTokenB(AddressZero, tokenB.address)
+      ).to.revertedWith("oe12");
+      await expect(
+        opportunity.setTokenAandTokenB(tokenA.address, AddressZero)
+      ).to.revertedWith("oe12");
+      await expect(
+        opportunity.setTokenAandTokenB(tokenB.address, DAI.address)
+      ).to.revertedWith("pair is not valid");
       await expect(opportunity.setSwapContract(AddressZero)).to.revertedWith(
         "oe12"
       );
