@@ -25,7 +25,7 @@ const tokenFixture: Fixture<{
   CAKE: ERC20PresetMinterPauser;
   DAI: ERC20PresetMinterPauser;
   USDT: ERC20PresetMinterPauser;
-  WBNB: IWETH;
+  WBNB: ERC20PresetMinterPauser;
   BNB: Address;
 }> = async ([wallet], provider) => {
   const signer = provider.getSigner(wallet.address);
@@ -34,7 +34,10 @@ const tokenFixture: Fixture<{
       "CAKE minter",
       "CAKE"
     ),
-    WBNB: await new WETH__factory(signer).deploy(),
+    WBNB: await new ERC20PresetMinterPauser__factory(signer).deploy(
+      "WBNB minter",
+      "WBNB"
+    ),
     BUSD: await new ERC20PresetMinterPauser__factory(signer).deploy(
       "BUSD minter",
       "BUSD"
@@ -64,7 +67,7 @@ export const pancakeOpportunitiesFixture: Fixture<{
   CAKE: ERC20PresetMinterPauser;
   DAI: ERC20PresetMinterPauser;
   USDT: ERC20PresetMinterPauser;
-  WBNB: IWETH;
+  WBNB: ERC20PresetMinterPauser;
   BNB: Address;
   cakeWbnbPair: IUniswapV2PairTest;
   cakeUsdtPair: IUniswapV2PairTest;

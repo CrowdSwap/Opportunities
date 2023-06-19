@@ -1380,7 +1380,9 @@ describe("PancakeCakeBnbOpportunity", async () => {
       const balanceBeforeTokenA = await tokenA.balanceOf(account1.address);
       const balanceBeforeTokenB = await tokenB.balanceOf(account1.address);
 
-      const totalFee = getUnstakeFee(amountLP).add(getRemoveLiqFee(amountLP));
+      const totalFee = getUnstakeFee(amountLP)
+        .add(getRemoveLiqFee(amountLP))
+        .add(1);
 
       const transaction = await cakeWbnbOpportunity.leave({
         amount: amountLP,

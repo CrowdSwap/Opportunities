@@ -2,7 +2,7 @@ import { Fixture } from "ethereum-waffle";
 import { Wallet } from "ethers";
 import { ethers, upgrades } from "hardhat";
 import {
-  IUniswapV2Factory,
+  UniswapV2FactoryTest,
   IUniswapV2Router02,
   IWETH,
   IWETH__factory,
@@ -21,12 +21,12 @@ export async function createDexUniswapV2(
   wallet: Wallet,
   weth: IWETH
 ): Promise<{
-  factory: IUniswapV2Factory;
+  factory: UniswapV2FactoryTest;
   router: IUniswapV2Router02;
 }> {
   /* ================= DEPLOY UNISWAPV2 FACTORY CONTRACT ================= */
   const uniswapV2FactoryFactory = await ethers.getContractFactory(
-    "UniswapV2Factory"
+    "UniswapV2FactoryTest"
   );
   const factory = (await upgrades.deployProxy(
     uniswapV2FactoryFactory,
@@ -34,7 +34,7 @@ export async function createDexUniswapV2(
     {
       kind: "uups",
     }
-  )) as IUniswapV2Factory;
+  )) as UniswapV2FactoryTest;
 
   /* ================= DEPLOY UNISWAPV2 ROUTER02 CONTRACT ================= */
   const uniswapV2RouterFactory = await ethers.getContractFactory(
@@ -56,7 +56,7 @@ export async function createDexUniswapV2(
   };
 }
 export const uniswapV2Fixture: Fixture<{
-  factory: IUniswapV2Factory;
+  factory: UniswapV2FactoryTest;
   router: IUniswapV2Router02;
   WETH: IWETH;
 }> = async ([wallet], provider) => {

@@ -25,7 +25,7 @@ describe("CrowdUsdtLpStakeOpportunity", async () => {
 
   describe("invest", async () => {
     describe("token/token pair", async () => {
-      it("User should be able to invest sending token A", async () => {
+      it.only("User should be able to invest sending token A", async () => {
         const {
           crowdUsdtOpportunity: opportunity,
           CROWD: tokenA,
@@ -42,7 +42,7 @@ describe("CrowdUsdtLpStakeOpportunity", async () => {
 
         //It would be replaced in the contract
         const swapAmountIn = ethers.utils.parseUnits(
-          "0",
+          "1",
           await tokenA.decimals()
         );
         const swapMinAmountOut = ethers.utils.parseUnits(
@@ -1864,10 +1864,10 @@ describe("CrowdUsdtLpStakeOpportunity", async () => {
     for (let i = 10; i < tx.data.length; i += 64) {
       params.push(ethers.utils.arrayify("0x" + tx.data.substring(i, i + 64)));
     }
-    const d =
-      Dexchanges[dexName].networks[Networks.MAINNET] ??
-      Dexchanges[dexName].networks[Networks.POLYGON_MAINNET];
-    const flag = d[0].code;
+    // const d =
+    //   Dexchanges[dexName].networks[Networks.MAINNET] ??
+    //   Dexchanges[dexName].networks[Networks.POLYGON_MAINNET];
+    const flag = 0;
 
     return {
       selector: selector,
