@@ -1,25 +1,23 @@
 import { Fixture } from "ethereum-waffle";
-import { Address } from "ethereumjs-util";
+import { Address, zeroAddress } from "ethereumjs-util";
 import { BigNumber, Wallet } from "ethers";
 import { ethers, upgrades } from "hardhat";
 import {
   CrowdUsdtLpStakeOpportunityV2,
   CrowdUsdtLpStakeOpportunityV2__factory,
-  CrowdswapV1Test__factory,
   CrowdswapV1Test,
+  CrowdswapV1Test__factory,
   ERC20PresetMinterPauser,
-  ERC20PresetMinterPauser__factory as Erc20Test__factory,
+  ERC20PresetMinterPauser__factory,
+  Erc20Test__factory,
   StakingLP,
   StakingLP__factory,
   UniswapV2FactoryTest,
   UniswapV2PairTest,
   UniswapV2PairTest__factory,
-  IUniswapV2Router02,
+  UniswapV2Router02Test,
   WETH,
   WETH__factory,
-  UniswapV2Router02Test,
-  UniswapV2FactoryTest__factory,
-  UniswapV2Router02Test__factory,
 } from "../../artifacts/types";
 import { createDexUniswapV2 } from "./uniswapV2.fixture";
 
@@ -48,8 +46,8 @@ const tokenFixture: Fixture<{
   };
   const CROWD = await new Erc20Test__factory(signer).deploy(
     token.name,
-    token.symbol
-    // token.decimals
+    token.symbol,
+    token.decimals
   );
 
   token = {
@@ -61,8 +59,8 @@ const tokenFixture: Fixture<{
   };
   const USDT = await new Erc20Test__factory(signer).deploy(
     token.name,
-    token.symbol
-    // token.decimals
+    token.symbol,
+    token.decimals
   );
 
   token = {
@@ -74,8 +72,8 @@ const tokenFixture: Fixture<{
   };
   const DAI = await new Erc20Test__factory(signer).deploy(
     token.name,
-    token.symbol
-    // token.decimals
+    token.symbol,
+    token.decimals
   );
 
   token = {
@@ -133,46 +131,87 @@ export const crowdUsdtLpStakeOpportunityFixtureV2: Fixture<{
     "Apeswap",
     "Radioshack",
   ]; //to register in CrowdSwapV1
+
+  const availableFlags = [0x01, 0x03, 0x08, 0x09, 0x20];
   //liquidityProvider1 does not have enough ETH to create ETH/token pool. So it should be borrow other (liquidityProvider2)
   const liquidityProvider2Balance = await liquidityProvider2.getBalance();
   await liquidityProvider2.sendTransaction({
     to: liquidityProvider1.address,
     value: liquidityProvider2Balance.sub(ethers.utils.parseEther("10")),
   });
+  let index = 0;
+  const dexes: { [key: string]: UniswapV2Fork } = {};
+  for (let dexName of availableDexesList) {
+    //All values are in eth
+    const initialAmountCrowdInPair = "20000";
+    const initialAmountUsdtInPair = "1000";
+    const initialAmountDaiInPair = "1000";
+    const initialAmountWmaticInPair = "1000";
+    const { router, factory } = await createDexUniswapV2(wallet, WMATIC);
+    // const d =
+    //   Dexchanges[dexName].networks[Networks.MAINNET] ??
+    //   Dexchanges[dexName].networks[Networks.POLYGON_MAINNET];
+    const flag = availableFlags[index];
+    index++;
+    const dex: UniswapV2Fork = new UniswapV2Fork(router, factory, flag);
+    await dex.createPair(
+      CROWD,
+      USDT,
+      initialAmountCrowdInPair,
+      initialAmountUsdtInPair,
+      liquidityProvider1
+    );
+    await dex.createPair(
+      DAI,
+      USDT,
+      initialAmountDaiInPair,
+      initialAmountUsdtInPair,
+      liquidityProvider1
+    );
+    await dex.createPairEth(
+      USDT,
+      WMATIC,
+      initialAmountUsdtInPair,
+      initialAmountWmaticInPair,
+      liquidityProvider1
+    );
+    await dex.createPairEth(
+      DAI,
+      WMATIC,
+      initialAmountDaiInPair,
+      initialAmountWmaticInPair,
+      liquidityProvider1
+    );
+    await dex.createPairEth(
+      CROWD,
+      WMATIC,
+      initialAmountCrowdInPair,
+      initialAmountWmaticInPair,
+      liquidityProvider1
+    );
+    dexes[dexName] = dex;
+  }
 
-  const factory = await new UniswapV2FactoryTest__factory(signer).deploy();
-  const router = await new UniswapV2Router02Test__factory(signer).deploy(
-    factory.address,
-    WMATIC.address
+  const crowdUsdtPair = await dexes["UniswapV2"].getPair(
+    CROWD,
+    USDT,
+    liquidityProvider1
   );
-
-  await createPair(CROWD, USDT, "400000", "1000", router, wallet);
-  await createPairEth(CROWD, WMATIC, "400000", "2000", router, wallet);
-
-  const crowdUsdtPairAddress = await factory.getPair(
-    CROWD.address,
-    USDT.address
-  );
-  const crowdWmaticPairAddress = await factory.getPair(
-    CROWD.address,
-    USDT.address
-  );
-
-  const crowdUsdtPair = UniswapV2PairTest__factory.connect(
-    crowdUsdtPairAddress,
-    wallet
-  );
-
-  const crowdWmaticPair = UniswapV2PairTest__factory.connect(
-    crowdWmaticPairAddress,
-    wallet
+  const crowdWmaticPair = await dexes["UniswapV2"].getPair(
+    CROWD,
+    WMATIC,
+    liquidityProvider1
   );
 
   /* ================= CREATING AGGREGATOR CONTRACT ================= */
 
-  const crowdswapV1 = await new CrowdswapV1Test__factory(signer).deploy([
-    { adr: router.address, flag: 0 },
-  ]);
+  const dexAddressFlags = Object.values(dexes).map((dex: UniswapV2Fork) => {
+    return { adr: dex.router.address, flag: dex.flag };
+  });
+
+  const crowdswapV1 = await new CrowdswapV1Test__factory(signer).deploy(
+    dexAddressFlags
+  );
 
   const currentTimestamp = await ethers.provider.getBlock("latest");
   const crowdUsdtLpStakingFactory = new StakingLP__factory(signer);
@@ -232,12 +271,12 @@ export const crowdUsdtLpStakeOpportunityFixtureV2: Fixture<{
     [
       CROWD.address,
       USDT.address,
-      factory.address,
+      dexes["UniswapV2"].factory.address,
       feeStruct,
       crowdswapV1.address,
-      router.address,
+      dexes["UniswapV2"].router.address,
       crowdUsdtLpStaking.address,
-      WMATIC.address,
+      "0x0000000000000000000000000000000000000000",
     ],
     {
       kind: "uups",
@@ -251,10 +290,10 @@ export const crowdUsdtLpStakeOpportunityFixtureV2: Fixture<{
     [
       CROWD.address,
       WMATIC.address,
-      factory.address,
+      dexes["UniswapV2"].factory.address,
       feeStruct,
       crowdswapV1.address,
-      router.address,
+      dexes["UniswapV2"].router.address,
       crowdWmaticLpStaking.address,
       WMATIC.address,
     ],
@@ -277,11 +316,11 @@ export const crowdUsdtLpStakeOpportunityFixtureV2: Fixture<{
     crowdUsdtOpportunity,
     crowdWmaticOpportunity,
     crowdswapV1,
-    uniswapV2: router,
-    sushiswap: router,
-    quickswap: router,
-    apeswap: router,
-    radioshack: router,
+    uniswapV2: dexes["UniswapV2"].router,
+    sushiswap: dexes["Sushiswap"].router,
+    quickswap: dexes["Quickswap"].router,
+    apeswap: dexes["Apeswap"].router,
+    radioshack: dexes["Radioshack"].router,
     stakingCrowdUsdtLP: crowdUsdtLpStaking,
     stakingCrowdWmaticLP: crowdWmaticLpStaking,
     CROWD,
@@ -293,97 +332,6 @@ export const crowdUsdtLpStakeOpportunityFixtureV2: Fixture<{
     crowdWmaticPair,
   };
 };
-function getDexFlag(dexName: string): any {
-  if (dexName == "UniswapV2") {
-    return 0x1;
-  } else if (dexName == "Sushiswap") {
-    return 0x03;
-  } else if (dexName == "Quickswap") {
-    return 0x08;
-  } else if (dexName == "Apeswap") {
-    return 0x09;
-  } else if (dexName == "Radioshack") {
-    return 0x20;
-  }
-}
-
-async function createPair(
-  token0: ERC20PresetMinterPauser,
-  token1: ERC20PresetMinterPauser,
-  initialAmount0InEth: string,
-  initialAmount1InEth: string,
-  router,
-  liquidityProvider: Wallet
-): Promise<UniswapV2PairTest> {
-  let decimals = await token0.decimals();
-  const initialAmount0 = ethers.utils.parseUnits(initialAmount0InEth, decimals);
-
-  decimals = await token1.decimals();
-  const initialAmount1 = ethers.utils.parseUnits(initialAmount1InEth, decimals);
-
-  const amountMin0 = ethers.utils.parseUnits("0");
-  const amountMin1 = ethers.utils.parseUnits("0");
-  const deadline = (await ethers.provider.getBlock("latest")).timestamp + 1000;
-
-  await token0.mint(liquidityProvider.address, initialAmount0);
-  await token0
-    .connect(liquidityProvider)
-    .approve(router.address, initialAmount0);
-
-  await token1.mint(liquidityProvider.address, initialAmount1);
-  await token1
-    .connect(liquidityProvider)
-    .approve(router.address, initialAmount1);
-
-  await router
-    .connect(liquidityProvider)
-    .addLiquidity(
-      token0.address,
-      token1.address,
-      initialAmount0,
-      initialAmount1,
-      amountMin0,
-      amountMin1,
-      liquidityProvider.address,
-      deadline
-    );
-}
-
-async function createPairEth(
-  token0: ERC20PresetMinterPauser,
-  token1: WETH,
-  initialAmount0InEth: string,
-  initialAmount1InEth: string,
-  router,
-  liquidityProvider: Wallet
-): Promise<UniswapV2PairTest> {
-  let decimals = await token0.decimals();
-  const initialAmount0 = ethers.utils.parseUnits(initialAmount0InEth, decimals);
-
-  decimals = 18; //decimals of ETH
-  const initialAmount1 = ethers.utils.parseUnits(initialAmount1InEth, decimals);
-
-  const amountMin0 = ethers.utils.parseUnits("0");
-  const amountMin1 = ethers.utils.parseUnits("0");
-  const deadline = (await ethers.provider.getBlock("latest")).timestamp + 1000;
-
-  await token0.mint(liquidityProvider.address, initialAmount0);
-  await token0
-    .connect(liquidityProvider)
-    .approve(router.address, initialAmount0);
-
-  await router
-    .connect(liquidityProvider)
-    .addLiquidityETH(
-      token0.address,
-      initialAmount0,
-      amountMin0,
-      amountMin1,
-      liquidityProvider.address,
-      deadline,
-      { value: initialAmount1 }
-    );
-}
 
 class UniswapV2Fork {
   private readonly _router: UniswapV2Router02Test;

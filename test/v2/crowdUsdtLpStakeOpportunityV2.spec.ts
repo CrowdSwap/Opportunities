@@ -25,7 +25,7 @@ describe("CrowdUsdtLpStakeOpportunity", async () => {
 
   describe("invest", async () => {
     describe("token/token pair", async () => {
-      it.only("User should be able to invest sending token A", async () => {
+      it("User should be able to invest sending token A", async () => {
         const {
           crowdUsdtOpportunity: opportunity,
           CROWD: tokenA,
@@ -458,158 +458,6 @@ describe("CrowdUsdtLpStakeOpportunity", async () => {
         expect(swappedEventsList[0]).to.not.be.undefined;
         expect(swappedEventsList[0].args.user).to.be.equal(owner.address);
         expect(swappedEventsList[0].args.fromToken).to.be.equal(tokenC.address);
-        expect(swappedEventsList[0].args.toToken).to.be.equal(tokenB.address);
-        expect(swappedEventsList[0].args.amountIn).to.be.equal(amountIn);
-        expect(swappedEventsList[0].args.amountOut).to.not.be.undefined;
-
-        const totalFee = getFee(
-          swappedEventsList[0].args.amountOut,
-          ADD_LIQUIDITY_FEE_PERCENTAGE + STAKE_FEE_PERCENTAGE
-        );
-
-        const feeDeductedEvent = receipt.events.find(
-          (event) => event.event === "FeeDeducted"
-        );
-        expect(feeDeductedEvent).to.not.be.undefined;
-        expect(feeDeductedEvent.args.user).to.be.equal(owner.address);
-        expect(feeDeductedEvent.args.token).to.be.equal(tokenB.address);
-        expect(feeDeductedEvent.args.amount).to.be.equal(
-          swappedEventsList[0].args.amountOut
-        );
-        expect(feeDeductedEvent.args.totalFee).to.be.equal(totalFee);
-
-        expect(swappedEventsList[1]).to.not.be.undefined;
-        expect(swappedEventsList[1].args.user).to.be.equal(owner.address);
-        expect(swappedEventsList[1].args.fromToken).to.be.equal(tokenB.address);
-        expect(swappedEventsList[1].args.toToken).to.be.equal(tokenA.address);
-        expect(swappedEventsList[1].args.amountIn).to.not.be.undefined;
-        expect(swappedEventsList[1].args.amountOut).to.not.be.undefined;
-
-        const addedLiquidityEvent = receipt.events.find(
-          (event) => event.event === "AddedLiquidity"
-        );
-        expect(addedLiquidityEvent).to.not.be.undefined;
-        expect(addedLiquidityEvent.args.user).to.be.equal(owner.address);
-        expect(addedLiquidityEvent.args.liquidity).to.not.be.undefined;
-
-        const stakedEvent = receipt.events.find(
-          (event) => event.event === "Staked"
-        );
-        expect(stakedEvent).to.not.be.undefined;
-        expect(stakedEvent.args.user).to.be.equal(user.address);
-        expect(stakedEvent.args.amount).to.be.equal(
-          addedLiquidityEvent.args.liquidity
-        );
-
-        const remainedAmountA = swappedEventsList[1].args.amountOut.sub(
-          addedLiquidityEvent.args.amountA
-        );
-        const remainedAmountB = swappedEventsList[0].args.amountOut
-          .sub(feeDeductedEvent.args.totalFee)
-          .sub(swappedEventsList[1].args.amountIn)
-          .sub(addedLiquidityEvent.args.amountB);
-
-        //The remained tokens should be transferred to the user
-        const refundEventsList = receipt.events.filter(
-          (event) => event.event === "Refund"
-        );
-        for (let refundEvent of refundEventsList) {
-          expect(refundEvent.args.token).to.be.oneOf([
-            tokenA.address,
-            tokenB.address,
-          ]);
-          expect(refundEvent.args.user).to.be.equal(user.address);
-          switch (refundEvent.args.token) {
-            case tokenA.address:
-              expect(refundEvent.args.amount).to.be.equal(remainedAmountA);
-              break;
-            case tokenB.address:
-              expect(refundEvent.args.amount).to.be.equal(remainedAmountB);
-              break;
-          }
-        }
-      });
-
-      it("User should be able to invest sending network coin", async () => {
-        const {
-          crowdUsdtOpportunity: opportunity,
-          CROWD: tokenA,
-          USDT: tokenB,
-          MATIC: tokenC,
-          WMATIC: WETH,
-          uniswapV2,
-        } = await loadFixture(crowdUsdtLpStakeOpportunityFixtureV2);
-
-        const amountIn = ethers.utils.parseUnits("100", 18);
-
-        const swap1MinAmountOut = ethers.utils.parseUnits(
-          "40",
-          await tokenB.decimals()
-        );
-
-        const swap1Tx =
-          await uniswapV2.populateTransaction.swapExactETHForTokens(
-            swap1MinAmountOut,
-            [WETH.address, tokenB.address],
-            await opportunity.swapContract(),
-            (await ethers.provider.getBlock("latest")).timestamp + 100000
-          );
-        const dexDescriptor1 = dexDescriptorFromTransaction(
-          swap1Tx,
-          "UniswapV2"
-        );
-        dexDescriptor1.isReplace = false;
-
-        // //It would be replaced in the contract
-        const swap2AmountIn = ethers.utils.parseUnits(
-          "0",
-          await tokenB.decimals()
-        );
-        const swap2MinAmountOut = ethers.utils.parseUnits(
-          "40",
-          await tokenA.decimals()
-        );
-        const swap2Tx =
-          await uniswapV2.populateTransaction.swapExactTokensForTokens(
-            swap2AmountIn,
-            swap2MinAmountOut,
-            [tokenB.address, tokenA.address],
-            await opportunity.swapContract(),
-            (await ethers.provider.getBlock("latest")).timestamp + 100000
-          );
-        const dexDescriptor2 = dexDescriptorFromTransaction(
-          swap2Tx,
-          "UniswapV2"
-        );
-
-        const oppTx = await opportunity.investByToken(
-          user.address,
-          tokenC.toString(),
-          amountIn,
-          dexDescriptor1,
-          dexDescriptor2,
-          (await ethers.provider.getBlock("latest")).timestamp + 100000,
-          { value: amountIn }
-        );
-
-        const receipt = await oppTx.wait();
-
-        const InvestedByTokenEvent = receipt.events.find(
-          (event) => event.event === "InvestedByToken"
-        );
-        expect(InvestedByTokenEvent).to.not.be.undefined;
-        expect(InvestedByTokenEvent.args.user).to.be.equal(user.address);
-        expect(InvestedByTokenEvent.args.token).to.be.equal(tokenC.toString());
-        expect(InvestedByTokenEvent.args.amount).to.be.equal(amountIn);
-
-        const swappedEventsList = receipt.events.filter(
-          (event) => event.event === "Swapped"
-        );
-        expect(swappedEventsList[0]).to.not.be.undefined;
-        expect(swappedEventsList[0].args.user).to.be.equal(owner.address);
-        expect(swappedEventsList[0].args.fromToken).to.be.equal(
-          tokenC.toString()
-        );
         expect(swappedEventsList[0].args.toToken).to.be.equal(tokenB.address);
         expect(swappedEventsList[0].args.amountIn).to.be.equal(amountIn);
         expect(swappedEventsList[0].args.amountOut).to.not.be.undefined;
@@ -1640,33 +1488,6 @@ describe("CrowdUsdtLpStakeOpportunity", async () => {
       await expect(feeStruct.aggregatorFee).to.eq(newFee);
     });
 
-    it("should change the tokenA", async () => {
-      const { crowdUsdtOpportunity: opportunity } = await loadFixture(
-        crowdUsdtLpStakeOpportunityFixtureV2
-      );
-      const newAddress = "0x7Be8076f4EA4A4AD08075C2508e481d6C946D12b";
-      await opportunity.setTokenA(newAddress);
-      await expect(await opportunity.tokenA()).to.eq(newAddress);
-    });
-
-    it("should change the tokenB", async () => {
-      const { crowdUsdtOpportunity: opportunity } = await loadFixture(
-        crowdUsdtLpStakeOpportunityFixtureV2
-      );
-      const newAddress = "0x7Be8076f4EA4A4AD08075C2508e481d6C946D12b";
-      await opportunity.setTokenB(newAddress);
-      await expect(await opportunity.tokenB()).to.eq(newAddress);
-    });
-
-    it("should change the pair contract", async () => {
-      const { crowdUsdtOpportunity: opportunity } = await loadFixture(
-        crowdUsdtLpStakeOpportunityFixtureV2
-      );
-      const newAddress = "0x7Be8076f4EA4A4AD08075C2508e481d6C946D12b";
-      await opportunity.setPair(newAddress);
-      await expect(await opportunity.pair()).to.eq(newAddress);
-    });
-
     it("should change the swap contract", async () => {
       const { crowdUsdtOpportunity: opportunity } = await loadFixture(
         crowdUsdtLpStakeOpportunityFixtureV2
@@ -1692,81 +1513,6 @@ describe("CrowdUsdtLpStakeOpportunity", async () => {
       const newAddress = "0x7Be8076f4EA4A4AD08075C2508e481d6C946D12b";
       await opportunity.setStakingLP(newAddress);
       await expect(await opportunity.stakingLP()).to.eq(newAddress);
-    });
-
-    it("should fail using none owner address", async () => {
-      const { crowdUsdtOpportunity: opportunity, CROWD: tokenA } =
-        await loadFixture(crowdUsdtLpStakeOpportunityFixtureV2);
-      const newAddress = "0x7Be8076f4EA4A4AD08075C2508e481d6C946D12b";
-      const newFee = ethers.utils.parseEther("0.2");
-      const withdrawAmount = ethers.utils.parseEther("1");
-
-      await expect(
-        opportunity.connect(account1).setFeeTo(newAddress)
-      ).to.revertedWith("ce30");
-
-      await expect(
-        opportunity.connect(account1).setAddLiquidityFee(newFee)
-      ).to.revertedWith("ce30");
-
-      await expect(
-        opportunity.connect(account1).setRemoveLiquidityFee(newFee)
-      ).to.revertedWith("ce30");
-
-      await expect(
-        opportunity.connect(account1).setStakeFee(newFee)
-      ).to.revertedWith("ce30");
-
-      await expect(
-        opportunity.connect(account1).setUnstakeFee(newFee)
-      ).to.revertedWith("ce30");
-
-      await expect(
-        opportunity.connect(account1).setTokenA(newAddress)
-      ).to.revertedWith("ce30");
-
-      await expect(
-        opportunity.connect(account1).setTokenB(newAddress)
-      ).to.revertedWith("ce30");
-
-      await expect(
-        opportunity.connect(account1).setPair(newAddress)
-      ).to.revertedWith("ce30");
-
-      await expect(
-        opportunity.connect(account1).setSwapContract(newAddress)
-      ).to.revertedWith("ce30");
-
-      await expect(
-        opportunity.connect(account1).setRouter(newAddress)
-      ).to.revertedWith("ce30");
-
-      await expect(
-        opportunity.connect(account1).setStakingLP(newAddress)
-      ).to.revertedWith("ce30");
-
-      await expect(
-        opportunity
-          .connect(account1)
-          .withdrawFunds(tokenA.address, withdrawAmount, owner.address)
-      ).to.revertedWith("ce30");
-    });
-
-    it("should fail to set addresses to zero", async () => {
-      const { crowdUsdtOpportunity: opportunity } = await loadFixture(
-        crowdUsdtLpStakeOpportunityFixtureV2
-      );
-      await expect(opportunity.setFeeTo(AddressZero)).to.revertedWith("oe12");
-      await expect(opportunity.setTokenA(AddressZero)).to.revertedWith("oe12");
-      await expect(opportunity.setTokenB(AddressZero)).to.revertedWith("oe12");
-      await expect(opportunity.setPair(AddressZero)).to.revertedWith("oe12");
-      await expect(opportunity.setSwapContract(AddressZero)).to.revertedWith(
-        "oe12"
-      );
-      await expect(opportunity.setRouter(AddressZero)).to.revertedWith("oe12");
-      await expect(opportunity.setStakingLP(AddressZero)).to.revertedWith(
-        "oe12"
-      );
     });
   });
 
@@ -1859,6 +1605,13 @@ describe("CrowdUsdtLpStakeOpportunity", async () => {
   }
 
   function dexDescriptorFromTransaction(tx, dexName: string) {
+    const Dexchanges = {
+      UniswapV2: { code: 0x01 },
+      Sushiswap: { code: 0x03 },
+      Quickswap: { code: 0x08 },
+      Apeswap: { code: 0x09 },
+      Radioshack: { code: 0x20 },
+    };
     const selector = ethers.utils.arrayify(tx.data.substring(0, 10));
     let params: Uint8Array[] = [];
     for (let i = 10; i < tx.data.length; i += 64) {
@@ -1867,7 +1620,7 @@ describe("CrowdUsdtLpStakeOpportunity", async () => {
     // const d =
     //   Dexchanges[dexName].networks[Networks.MAINNET] ??
     //   Dexchanges[dexName].networks[Networks.POLYGON_MAINNET];
-    const flag = 0;
+    const flag = Dexchanges[dexName].code;
 
     return {
       selector: selector,

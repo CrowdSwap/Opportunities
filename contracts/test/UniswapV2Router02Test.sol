@@ -6,6 +6,8 @@ import "./UniswapV2FactoryTest.sol";
 import "../interfaces/IUniswapV2Router02.sol";
 import "./lib/UniswapV2LibraryTest.sol";
 import "../interfaces/IWETH.sol";
+import "../interfaces/IUniswapV2Pair.sol";
+import "./lib/libraries/TransferHelper.sol";
 
 contract UniswapV2Router02Test is IUniswapV2Router02, BaseTest {
     address public factory;
@@ -46,6 +48,28 @@ contract UniswapV2Router02Test is IUniswapV2Router02, BaseTest {
         return results;
     }
 
+    // **** SWAP ****
+    // requires the initial amount to have already been sent to the first pair
+    function _swap(
+        uint256[] memory amounts,
+        address[] memory path,
+        address _to
+    ) internal virtual {
+        for (uint256 i; i < path.length - 1; i++) {
+            (address input, address output) = (path[i], path[i + 1]);
+            (address token0, ) = UniswapV2LibraryTest.sortTokens(input, output);
+            uint256 amountOut = amounts[i + 1];
+            (uint256 amount0Out, uint256 amount1Out) = input == token0
+                ? (uint256(0), amountOut)
+                : (amountOut, uint256(0));
+            address to = i < path.length - 2
+                ? UniswapV2LibraryTest.pairFor(factory, output, path[i + 2])
+                : _to;
+            IUniswapV2Pair(UniswapV2LibraryTest.pairFor(factory, input, output))
+                .swap(amount0Out, amount1Out, to, new bytes(0));
+        }
+    }
+
     function swapExactTokensForTokens(
         uint256 amountIn,
         uint256 amountOutMin,
@@ -53,11 +77,18 @@ contract UniswapV2Router02Test is IUniswapV2Router02, BaseTest {
         address to,
         uint256 deadline
     ) external override returns (uint256[] memory amounts) {
-        super._safeTransferFrom(path[0], msg.sender, address(this), amountIn);
-        super._safeTransfer(path[path.length - 1], to, amountOut);
-        uint256[] memory results = new uint256[](1);
-        results[0] = amountOut;
-        return results;
+        amounts = UniswapV2LibraryTest.getAmountsOut(factory, amountIn, path);
+        require(
+            amounts[amounts.length - 1] >= amountOutMin,
+            "UniswapV2Router: INSUFFICIENT_OUTPUT_AMOUNT"
+        );
+        TransferHelper.safeTransferFrom(
+            path[0],
+            msg.sender,
+            UniswapV2LibraryTest.pairFor(factory, path[0], path[1]),
+            amounts[0]
+        );
+        _swap(amounts, path, to);
     }
 
     function addLiquidity(
@@ -87,7 +118,7 @@ contract UniswapV2Router02Test is IUniswapV2Router02, BaseTest {
         address pair = UniswapV2FactoryTest(factory).getPair(tokenA, tokenB);
         super._safeTransferFrom(tokenA, msg.sender, pair, amountA);
         super._safeTransferFrom(tokenB, msg.sender, pair, amountB);
-        liquidity = IUniswapV2PairTest(pair).mint(to);
+        liquidity = IUniswapV2Pair(pair).mint(to);
     }
 
     function removeLiquidity(
@@ -106,8 +137,8 @@ contract UniswapV2Router02Test is IUniswapV2Router02, BaseTest {
         returns (uint amountA, uint amountB)
     {
         address pair = UniswapV2FactoryTest(factory).getPair(tokenA, tokenB);
-        IUniswapV2PairTest(pair).transferFrom(msg.sender, pair, liquidity);
-        (uint amount0, uint amount1) = IUniswapV2PairTest(pair).burn(to);
+        IUniswapV2Pair(pair).transferFrom(msg.sender, pair, liquidity);
+        (uint amount0, uint amount1) = IUniswapV2Pair(pair).burn(to);
         (amountA, amountB) = (amount0, amount1);
         require(
             amountA >= amountAMin,
@@ -220,7 +251,7 @@ contract UniswapV2Router02Test is IUniswapV2Router02, BaseTest {
         super._safeTransferFrom(token, msg.sender, pair, amountToken);
         IWETH(WETH).deposit{value: amountETH}();
         assert(IWETH(WETH).transfer(pair, amountETH));
-        liquidity = IUniswapV2PairTest(pair).mint(to);
+        liquidity = IUniswapV2Pair(pair).mint(to);
         // refund dust eth, if any
         if (msg.value > amountETH)
             super._safeTransferFrom(
