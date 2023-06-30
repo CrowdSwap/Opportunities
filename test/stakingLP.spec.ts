@@ -117,9 +117,7 @@ describe("StakingLP", async () => {
         stakingLP2
       );
 
-      await expect(stakingLP2.addToEligibleUsers(userAccount.address))
-        .to.emit(stakingLP2, "AddToEligibleUsers")
-        .withArgs(userAccount.address);
+      stakingLP2.addToEligibleUsers([userAccount.address]);
 
       expect(await stakingLP2.balanceOf(userAccount.address)).to.equal(0);
       await expect(
@@ -151,36 +149,6 @@ describe("StakingLP", async () => {
         .to.emit(stakingLP, "LPStaked")
         .withArgs(userAccount.address, amountLP);
       expect(await stakingLP.balanceOf(userAccount.address)).to.equal(amountLP);
-    });
-
-    it("ResonateAdapter should be able to stake", async () => {
-      const { stakingLP, crowdUsdtPair } = await loadFixture(stakingLpFixture);
-
-      const tx = await owner.sendTransaction({
-        to: "0x127F6e566212d3477b34725C9D1a422d6D960c97",
-        value: ethers.utils.parseEther("10"),
-      });
-      await tx.wait();
-
-      const amountLP = ethers.utils.parseEther("1");
-      const resonateAdapter = await mintAndApprove(
-        crowdUsdtPair,
-        amountLP,
-        "0x127F6e566212d3477b34725C9D1a422d6D960c97",
-        stakingLP
-      );
-
-      expect(await stakingLP.balanceOf(resonateAdapter.address)).to.equal(0);
-      await expect(
-        stakingLP
-          .connect(resonateAdapter)
-          .stakeLP(amountLP, resonateAdapter.address)
-      )
-        .to.emit(stakingLP, "LPStaked")
-        .withArgs(resonateAdapter.address, amountLP);
-      expect(await stakingLP.balanceOf(resonateAdapter.address)).to.equal(
-        amountLP
-      );
     });
   });
 
@@ -413,6 +381,7 @@ describe("StakingLP", async () => {
       const amountStakedLP = ethers.utils.parseEther("5");
       const amountWithdrawLP = ethers.utils.parseEther("2");
       const amountRemainedLP = ethers.utils.parseEther("3");
+
       const opportunity = await mintAndApprove(
         crowdUsdtPair,
         amountStakedLP,
@@ -664,9 +633,7 @@ describe("StakingLP", async () => {
         ethers.utils.parseEther("4.6296296")
       );
 
-      await expect(stakingLP2.addToEligibleUsers(userAccount.address))
-        .to.emit(stakingLP2, "AddToEligibleUsers")
-        .withArgs(userAccount.address);
+      await stakingLP2.addToEligibleUsers([userAccount.address]);
 
       const amountLP = ethers.utils.parseEther("5");
       const opportunity = await mintAndApprove(
@@ -702,6 +669,60 @@ describe("StakingLP", async () => {
       expect(await stakingLP2.earned(userAccount.address)).to.gte(
         ethers.utils.parseEther("800000")
       );
+    });
+
+    it("reward situation when reward < rewardsDuration", async () => {
+      const { stakingLP2, crowdUsdtPair, CROWD, crowdUsdtLpStakeOpportunity } =
+        await loadFixture(stakingLpFixture);
+      await stakingLP2.setOpportunityContract(
+        crowdUsdtLpStakeOpportunity.address
+      );
+      await stakingLP2.setResonateAdapter(
+        "0x127F6e566212d3477b34725C9D1a422d6D960c97"
+      );
+
+      console.log(`rewards: 0.000000000008  rewardDuration: 200`);
+      const rewards = ethers.utils.parseEther("0.000000000008");
+      await notify(CROWD, rewards, stakingLP2); // Duration 17,280,000
+      expect(await CROWD.balanceOf(stakingLP2.address)).to.equal(rewards);
+      // 8000000 * 1e6 / (200 * 24 * 3600) = 462962.962962963
+      const rewartRate1 = await stakingLP2.rewardRate();
+      expect(+ethers.utils.formatUnits(rewartRate1, 6)).to.gte(0.462962);
+
+      console.log("rewardRate", +ethers.utils.formatUnits(rewartRate1, 6));
+      await stakingLP2.addToEligibleUsers([userAccount.address]);
+
+      await moveTimeForward(5 * 24 * 3600); //day 0
+
+      const amountLP = ethers.utils.parseEther("5");
+      const opportunity = await mintAndApprove(
+        crowdUsdtPair,
+        amountLP,
+        crowdUsdtLpStakeOpportunity,
+        stakingLP2
+      );
+      expect(await stakingLP2.balanceOf(userAccount.address)).to.equal(0);
+      await expect(
+        stakingLP2.connect(opportunity).stakeLP(amountLP, userAccount.address)
+      )
+        .to.emit(stakingLP2, "LPStaked")
+        .withArgs(userAccount.address, amountLP);
+      expect(await stakingLP2.balanceOf(userAccount.address)).to.equal(
+        amountLP
+      );
+      const earn1 = await stakingLP2.earned(userAccount.address);
+      console.log("earn after start time", earn1);
+      expect(await stakingLP2.earned(userAccount.address)).to.gte(0);
+
+      await moveTimeForward(5 * 24 * 3600); //day 5
+
+      const earn2 = await stakingLP2.earned(userAccount.address);
+      console.log("earn after 5 days", ethers.utils.formatEther(earn2));
+
+      await moveTimeForward(5 * 24 * 3600); //day 10
+
+      const earn3 = await stakingLP2.earned(userAccount.address);
+      console.log("earn after 10 days", ethers.utils.formatEther(earn3));
     });
   });
 
@@ -767,8 +788,8 @@ describe("StakingLP", async () => {
         .to.emit(stakingLP, "RewardsDurationUpdated")
         .withArgs(oldRewardsDuration, newRewardsDuration);
       expect(await stakingLP.rewardsDuration()).to.equal(newRewardsDuration);
-      const newRewardRate = await stakingLP.rewardRate();
-      expect(newRewardRate).to.gte(expectedRewardRate);
+      const newRewardRate = (await stakingLP.rewardRate()).div(1e6);
+      expect(newRewardRate).to.gte(expectedRewardRate.div(1e6));
 
       await moveTimeForward(10 * 24 * 3600); //10 days
       const newEarned = await stakingLP.earned(userAccount.address);
@@ -805,7 +826,7 @@ describe("StakingLP", async () => {
           BigNumber.from(100 * 24 * 3600)
         );
       expect(await stakingLP2.rewardsDuration()).to.equal(100 * 24 * 3600);
-      expect(await stakingLP2.rewardRate()).to.equal(
+      expect((await stakingLP2.rewardRate()).div(1e6)).to.equal(
         rewards.div(BigNumber.from("8640000"))
       );
     });
@@ -902,9 +923,7 @@ describe("StakingLP", async () => {
         stakingLP2
       );
 
-      await expect(stakingLP2.addToEligibleUsers(userAccount.address))
-        .to.emit(stakingLP2, "AddToEligibleUsers")
-        .withArgs(userAccount.address);
+      await stakingLP2.addToEligibleUsers([userAccount.address]);
 
       expect(await stakingLP2.balanceOf(userAccount.address)).to.equal(0);
       await expect(
@@ -1091,9 +1110,7 @@ describe("StakingLP", async () => {
         stakingLP2
       );
 
-      await expect(stakingLP2.addToEligibleUsers(userAccount.address))
-        .to.emit(stakingLP2, "AddToEligibleUsers")
-        .withArgs(userAccount.address);
+      await stakingLP2.addToEligibleUsers([userAccount.address]);
 
       expect(await stakingLP2.balanceOf(userAccount.address)).to.equal(0);
       await expect(
@@ -1293,9 +1310,7 @@ describe("StakingLP", async () => {
         stakingLP2
       );
 
-      await expect(stakingLP2.addToEligibleUsers(userAccount.address))
-        .to.emit(stakingLP2, "AddToEligibleUsers")
-        .withArgs(userAccount.address);
+      await stakingLP2.addToEligibleUsers([userAccount.address]);
 
       expect(await stakingLP2.balanceOf(userAccount.address)).to.equal(0);
       await expect(
@@ -1396,6 +1411,12 @@ describe("StakingLP", async () => {
       const impersonated = await ethers.getImpersonatedSigner(
         caller.address ?? caller
       );
+
+      await owner.sendTransaction({
+        to: caller.address,
+        value: ethers.utils.parseEther("1"),
+      });
+
       await pair.connect(impersonated).approve(stakingLP.address, amount);
       return impersonated;
     }

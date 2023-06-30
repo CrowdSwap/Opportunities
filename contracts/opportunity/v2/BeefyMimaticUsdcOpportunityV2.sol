@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.10;
 
-import "./Opportunity.sol";
-import "../libraries/UniERC20Upgradeable.sol";
-import "../interfaces/IUniswapV2Router02.sol";
-import "../interfaces/IBeefyVault.sol";
+import "./OpportunityV2.sol";
+import "../../libraries/UniERC20Upgradeable.sol";
+import "../../interfaces/IUniswapV2Router02.sol";
+import "../../interfaces/IBeefyVault.sol";
 
 import "@openzeppelin/contracts-upgradeable/utils/AddressUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
@@ -14,8 +14,7 @@ import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeab
  * @notice The contract is used to add/remove liquidity in mimatic/usdc pool and
  * stake/unstake the corresponding LP token
  */
-contract BeefyMimaticUsdcOpportunity is Opportunity {
-
+contract BeefyMimaticUsdcOpportunityV2 is OpportunityV2 {
     using UniERC20Upgradeable for IERC20Upgradeable;
     using SafeERC20Upgradeable for IERC20Upgradeable;
 
@@ -29,12 +28,8 @@ contract BeefyMimaticUsdcOpportunity is Opportunity {
      * @dev The contract constructor
      * @param _tokenMimatic The address of the MIM token
      * @param _tokenUsdc The address of the USDC token
-     * @param _pairMimaticUsdc The address of the pair USDC/MIMATIC
-     * @param _feeTo The address of recipient of the fees
-     * @param _addLiquidityFee The initial fee of Add Liquidity step
-     * @param _removeLiquidityFee The initial fee of Remove Liquidity step
-     * @param _stakeFee The initial fee of Stake step
-     * @param _unstakeFee The initial fee of Unstake step
+     * @param _pairFactoryContract The address of the dex's factory
+     * @param _feeStruct Parameters needed for fee
      * @param _swapContract The address of the CrowdSwap Swap Contract
      * @param _router The address of the QuickSwap Router Contract
      * @param _vault The address of the Stake LP Contract
@@ -42,28 +37,20 @@ contract BeefyMimaticUsdcOpportunity is Opportunity {
     function initialize(
         address _tokenMimatic,
         address _tokenUsdc,
-        address _pairMimaticUsdc,
-        address payable _feeTo,
-        uint256 _addLiquidityFee,
-        uint256 _removeLiquidityFee,
-        uint256 _stakeFee,
-        uint256 _unstakeFee,
+        address _pairFactoryContract,
+        FeeStruct memory _feeStruct,
         address _swapContract,
         address _router,
-        address _vault
+        address _vault,
+        address _coinWrapper
     ) public initializer {
-        Opportunity._initializeContracts(
+        OpportunityV2._initializeContracts(
             _tokenMimatic,
             _tokenUsdc,
-            _pairMimaticUsdc
+            _pairFactoryContract,
+            _coinWrapper
         );
-        Opportunity._initializeFees(
-            _feeTo,
-            _addLiquidityFee,
-            _removeLiquidityFee,
-            _stakeFee,
-            _unstakeFee
-        );
+        OpportunityV2._initializeFees(_feeStruct);
         swapContract = _swapContract;
         router = IUniswapV2Router02(_router);
         vault = IBeefyVault(_vault);
@@ -90,7 +77,7 @@ contract BeefyMimaticUsdcOpportunity is Opportunity {
     function swap(
         IERC20Upgradeable _fromToken,
         uint256 _amount,
-        bytes calldata _data
+        bytes memory _data
     ) internal override returns (uint256) {
         // gas savings
         address _swapContract = swapContract;
@@ -112,16 +99,17 @@ contract BeefyMimaticUsdcOpportunity is Opportunity {
         IUniswapV2Router02 _router = router;
         tokenA.uniApprove(address(_router), _addLiqDescriptor.amountADesired);
         tokenB.uniApprove(address(_router), _addLiqDescriptor.amountBDesired);
-        return _router.addLiquidity(
-            address(tokenA),
-            address(tokenB),
-            _addLiqDescriptor.amountADesired,
-            _addLiqDescriptor.amountBDesired,
-            _addLiqDescriptor.amountAMin,
-            _addLiqDescriptor.amountBMin,
-            address(this),
-            _addLiqDescriptor.deadline
-        );
+        return
+            _router.addLiquidity(
+                address(tokenA),
+                address(tokenB),
+                _addLiqDescriptor.amountADesired,
+                _addLiqDescriptor.amountBDesired,
+                _addLiqDescriptor.amountAMin,
+                _addLiqDescriptor.amountBMin,
+                address(this),
+                _addLiqDescriptor.deadline
+            );
     }
 
     function removeLiquidity(
@@ -129,31 +117,38 @@ contract BeefyMimaticUsdcOpportunity is Opportunity {
     ) internal override returns (uint256, uint256) {
         IUniswapV2Router02 _router = router; // gas savings
         pair.uniApprove(address(_router), _removeLiqDescriptor.amount);
-        return _router.removeLiquidity(
-            address(tokenA),
-            address(tokenB),
-            _removeLiqDescriptor.amount,
-            _removeLiqDescriptor.amountAMin,
-            _removeLiqDescriptor.amountBMin,
-            _removeLiqDescriptor.receiverAccount,
-            _removeLiqDescriptor.deadline
-        );
+        return
+            _router.removeLiquidity(
+                address(tokenA),
+                address(tokenB),
+                _removeLiqDescriptor.amount,
+                _removeLiqDescriptor.amountAMin,
+                _removeLiqDescriptor.amountBMin,
+                _removeLiqDescriptor.receiverAccount,
+                _removeLiqDescriptor.deadline
+            );
     }
 
     function stake(address _userAddress, uint256 _amount) internal override {
         IBeefyVault _vault = vault; // gas savings
         pair.uniApprove(address(_vault), _amount);
         _vault.deposit(_amount);
-        IERC20Upgradeable(_vault).safeTransfer(_userAddress, _vault.balanceOf(address(this)));
+        IERC20Upgradeable(_vault).safeTransfer(
+            _userAddress,
+            _vault.balanceOf(address(this))
+        );
     }
 
     function unstake(
         uint256 _amount
     ) internal override returns (uint256, uint256) {
         IBeefyVault _vault = vault; // gas savings
-        IERC20Upgradeable(_vault).safeTransferFrom(msg.sender, address(this), _amount);
+        IERC20Upgradeable(_vault).safeTransferFrom(
+            msg.sender,
+            address(this),
+            _amount
+        );
         _vault.withdraw(_amount);
         return (0, 0);
     }
-
 }

@@ -30,7 +30,7 @@ const config = {
     deployer: 0,
   },
   networks: {
-    hardhat: {},
+    hardhat: { allowUnlimitedContractSize: true },
   },
   mocha: {
     timeout: 500000,
@@ -38,8 +38,7 @@ const config = {
   typechain: {
     outDir: "artifacts/types",
   },
-  etherscan: {
-  },
+  etherscan: {},
   gasReporter: {
     enabled: true,
     currency: "USD",
@@ -50,10 +49,10 @@ const config = {
     stakeFee: "0",
     unstakeFee: "300000000000000000",
     crossChainFee: "200000000000000000",
-    ['POLYGON_MAINNET']: {
+    ["POLYGON_MAINNET"]: {
       feeTo: FEE_TO_ADDRESS,
     },
-    ['BSCMAIN']: {
+    ["BSCMAIN"]: {
       feeTo: FEE_TO_ADDRESS,
     },
   },

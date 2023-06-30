@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.10;
 
-import "./Opportunity.sol";
-import "../libraries/UniERC20Upgradeable.sol";
-import "../interfaces/IUniswapV2Router02.sol";
-import "../interfaces/IPancakeMasterChefV2.sol";
+import "./OpportunityV2.sol";
+import "../../libraries/UniERC20Upgradeable.sol";
+import "../../interfaces/IUniswapV2Router02.sol";
+import "../../interfaces/IPancakeMasterChefV2.sol";
 import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/AddressUpgradeable.sol";
 
@@ -14,7 +14,7 @@ import "@openzeppelin/contracts-upgradeable/utils/AddressUpgradeable.sol";
  * stake/unstake the corresponding LP token
  * currently supported pools: cake-bnb, cake-usdt, cake-busd, busd-bnb
  */
-contract PancakeOpportunity is Opportunity, ReentrancyGuardUpgradeable {
+contract PancakeOpportunityV2 is OpportunityV2, ReentrancyGuardUpgradeable {
     using UniERC20Upgradeable for IERC20Upgradeable;
 
     address public swapContract;
@@ -29,25 +29,11 @@ contract PancakeOpportunity is Opportunity, ReentrancyGuardUpgradeable {
         uint256 distributedReward;
         bool exist;
     }
-    /**
-     * @dev A struct containing parameters needed to calculate fees
-     * @member feeTo The address of recipient of the fees
-     * @member addLiquidityFee The initial fee of Add Liquidity step
-     * @member removeLiquidityFee The initial fee of Remove Liquidity step
-     * @member stakeFee The initial fee of Stake step
-     * @member unstakeFee The initial fee of Unstake step
-     */
-    struct FeeStruct {
-        address payable feeTo;
-        uint256 addLiquidityFee;
-        uint256 removeLiquidityFee;
-        uint256 stakeFee;
-        uint256 unstakeFee;
-    }
 
     mapping(address => UserInfo) public userInfo;
 
     IERC20Upgradeable public rewardToken;
+    uint256 private newRewards;
 
     event SetMasterChef(address indexed user, address masterChefContract);
     event SetPId(address indexed user, uint256 pid);
@@ -58,8 +44,8 @@ contract PancakeOpportunity is Opportunity, ReentrancyGuardUpgradeable {
      * @param _tokenA The address of the A token
      * @param _tokenB The address of the B token
      * @param _rewardToken The address of the reward token
-     * @param _pair The address of the pair
-     * @param feeStruct Parameters needed for fee
+     * @param _pairFactoryContract The address of the dex's factory
+     * @param _feeStruct Parameters needed for fee
      * @param _swapContract The address of the CrowdSwap Swap Contract
      * @param _router The address of the PancakeSwap: Router v2 Contract
      * @param _pancakeMasterChefV2 The address of the Stake LP Contract
@@ -69,21 +55,21 @@ contract PancakeOpportunity is Opportunity, ReentrancyGuardUpgradeable {
         address _tokenA,
         address _tokenB,
         address _rewardToken,
-        address _pair,
-        FeeStruct memory feeStruct,
+        address _pairFactoryContract,
+        FeeStruct memory _feeStruct,
         address _swapContract,
         address _router,
         address _pancakeMasterChefV2,
-        uint256 _pId
+        uint256 _pId,
+        address _coinWrapper
     ) public initializer {
-        Opportunity._initializeContracts(_tokenA, _tokenB, _pair);
-        Opportunity._initializeFees(
-            feeStruct.feeTo,
-            feeStruct.addLiquidityFee,
-            feeStruct.removeLiquidityFee,
-            feeStruct.stakeFee,
-            feeStruct.unstakeFee
+        OpportunityV2._initializeContracts(
+            _tokenA,
+            _tokenB,
+            _pairFactoryContract,
+            _coinWrapper
         );
+        OpportunityV2._initializeFees(_feeStruct);
         swapContract = _swapContract;
         router = IUniswapV2Router02(_router);
         pancakeMasterChefV2 = IPancakeMasterChefV2(_pancakeMasterChefV2);
@@ -96,7 +82,7 @@ contract PancakeOpportunity is Opportunity, ReentrancyGuardUpgradeable {
         uint256 _beforeRewards = rewardToken.balanceOf(address(this));
         _pancakeMasterChefV2.deposit(pId, 0);
         uint256 _afterRewards = rewardToken.balanceOf(address(this));
-        uint256 _newRewards = _afterRewards - _beforeRewards;
+        newRewards = _afterRewards - _beforeRewards;
         (uint256 amount, , ) = _pancakeMasterChefV2.userInfo(
             pId,
             address(this)
@@ -104,7 +90,7 @@ contract PancakeOpportunity is Opportunity, ReentrancyGuardUpgradeable {
         for (uint256 i = 0; i < userAddressList.length; i++) {
             address userAddress = userAddressList[i];
             userInfo[userAddress].distributedReward +=
-                (_newRewards * userInfo[userAddress].lpBalance) /
+                (newRewards * userInfo[userAddress].lpBalance) /
                 amount;
         }
         _;
@@ -139,11 +125,9 @@ contract PancakeOpportunity is Opportunity, ReentrancyGuardUpgradeable {
         emit SetRewardToken(msg.sender, _rewardToken);
     }
 
-    function getUserInfo(address _userAddress)
-        external
-        view
-        returns (uint256, uint256)
-    {
+    function getUserInfo(
+        address _userAddress
+    ) external view returns (uint256, uint256) {
         require(userInfo[_userAddress].exist, "oe16");
         uint256 _lpBalance = userInfo[_userAddress].lpBalance;
         uint256 _rewards = userInfo[_userAddress].distributedReward;
@@ -153,7 +137,7 @@ contract PancakeOpportunity is Opportunity, ReentrancyGuardUpgradeable {
             address(this)
         );
 
-        (uint256 amount,,) = _pancakeMasterChefV2.userInfo(
+        (uint256 amount, , ) = _pancakeMasterChefV2.userInfo(
             pId,
             address(this)
         );
@@ -163,11 +147,9 @@ contract PancakeOpportunity is Opportunity, ReentrancyGuardUpgradeable {
         return (_lpBalance, _rewards);
     }
 
-    function withdrawRewards(uint256 _rewardAmount)
-        external
-        nonReentrant
-        updateRewards
-    {
+    function withdrawRewards(
+        uint256 _rewardAmount
+    ) external nonReentrant updateRewards {
         require(_rewardAmount > 0, "oe18");
         require(userInfo[msg.sender].exist, "oe16");
         require(
@@ -184,7 +166,7 @@ contract PancakeOpportunity is Opportunity, ReentrancyGuardUpgradeable {
     function swap(
         IERC20Upgradeable _fromToken,
         uint256 _amount,
-        bytes calldata _data
+        bytes memory _data
     ) internal override returns (uint256) {
         address _swapContract = swapContract; // gas savings
         if (!_fromToken.isETH()) {
@@ -198,15 +180,9 @@ contract PancakeOpportunity is Opportunity, ReentrancyGuardUpgradeable {
         return abi.decode(returnData, (uint256));
     }
 
-    function addLiquidity(AddLiqDescriptor memory _addLiqDescriptor)
-        internal
-        override
-        returns (
-            uint256,
-            uint256,
-            uint256
-        )
-    {
+    function addLiquidity(
+        AddLiqDescriptor memory _addLiqDescriptor
+    ) internal override returns (uint256, uint256, uint256) {
         IUniswapV2Router02 _router = router; // gas savings
         tokenA.uniApprove(address(_router), _addLiqDescriptor.amountADesired);
         tokenB.uniApprove(address(_router), _addLiqDescriptor.amountBDesired);
@@ -223,11 +199,9 @@ contract PancakeOpportunity is Opportunity, ReentrancyGuardUpgradeable {
             );
     }
 
-    function removeLiquidity(RemoveLiqDescriptor memory _removeLiqDescriptor)
-        internal
-        override
-        returns (uint256, uint256)
-    {
+    function removeLiquidity(
+        RemoveLiqDescriptor memory _removeLiqDescriptor
+    ) internal override returns (uint256, uint256) {
         IUniswapV2Router02 _router = router; // gas savings
         pair.uniApprove(address(_router), _removeLiqDescriptor.amount);
         return
@@ -242,11 +216,10 @@ contract PancakeOpportunity is Opportunity, ReentrancyGuardUpgradeable {
             );
     }
 
-    function stake(address _userAddress, uint256 _amount)
-        internal
-        override
-        updateRewards
-    {
+    function stake(
+        address _userAddress,
+        uint256 _amount
+    ) internal override updateRewards {
         require(_userAddress != address(0), "oe20");
 
         if (!userInfo[_userAddress].exist) {
@@ -261,12 +234,9 @@ contract PancakeOpportunity is Opportunity, ReentrancyGuardUpgradeable {
         _pancakeMasterChefV2.deposit(pId, _amount);
     }
 
-    function unstake(uint256 _amount)
-        internal
-        override
-        updateRewards
-        returns (uint256, uint256)
-    {
+    function unstake(
+        uint256 _amount
+    ) internal override updateRewards returns (uint256, uint256) {
         require(_amount > 0, "oe18");
         require(userInfo[msg.sender].exist, "oe16");
         require(userInfo[msg.sender].lpBalance >= _amount, "oe21");
@@ -302,5 +272,13 @@ contract PancakeOpportunity is Opportunity, ReentrancyGuardUpgradeable {
             userInfo[msg.sender].lpBalance -= _amount;
             return (_amount, 0);
         }
+    }
+
+    function getRewardToken() internal view override returns (address) {
+        return address(rewardToken);
+    }
+
+    function getNewRewards() internal view override returns (uint256) {
+        return newRewards;
     }
 }

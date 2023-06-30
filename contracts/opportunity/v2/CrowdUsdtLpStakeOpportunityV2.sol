@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.10;
 
-import "./Opportunity.sol";
-import "../libraries/UniERC20Upgradeable.sol";
-import "../interfaces/IUniswapV2Router02.sol";
-import "../interfaces/IStakingLP.sol";
+import "./OpportunityV2.sol";
+import "../../libraries/UniERC20Upgradeable.sol";
+import "../../interfaces/IUniswapV2Router02.sol";
+import "../../interfaces/IStakingLP.sol";
 
 import "@openzeppelin/contracts-upgradeable/utils/AddressUpgradeable.sol";
 
@@ -13,8 +13,7 @@ import "@openzeppelin/contracts-upgradeable/utils/AddressUpgradeable.sol";
  * @notice The contract is used to add/remove liquidity in crowd/usdt pool and
  * stake/unstake the corresponding LP token
  */
-contract CrowdUsdtLpStakeOpportunity is Opportunity {
-
+contract CrowdUsdtLpStakeOpportunityV2 is OpportunityV2 {
     using UniERC20Upgradeable for IERC20Upgradeable;
 
     address public swapContract;
@@ -27,12 +26,8 @@ contract CrowdUsdtLpStakeOpportunity is Opportunity {
      * @dev The contract constructor
      * @param _tokenCrowd The address of the CROWD token
      * @param _tokenUsdt The address of the USDT token
-     * @param _pairCrowdUsdt The address of the pair USDT/CROWD
-     * @param _feeTo The address of recipient of the fees
-     * @param _addLiquidityFee The initial fee of Add Liquidity step
-     * @param _removeLiquidityFee The initial fee of Remove Liquidity step
-     * @param _stakeFee The initial fee of Stake step
-     * @param _unstakeFee The initial fee of Unstake step
+     * @param _pairFactoryContract The address of the dex's factory
+     * @param _feeStruct Parameters needed for fee
      * @param _swapContract The address of the CrowdSwap Swap Contract
      * @param _router The address of the QuickSwap Router Contract
      * @param _stakingLP The address of the Stake LP Contract
@@ -40,28 +35,20 @@ contract CrowdUsdtLpStakeOpportunity is Opportunity {
     function initialize(
         address _tokenCrowd,
         address _tokenUsdt,
-        address _pairCrowdUsdt,
-        address payable _feeTo,
-        uint256 _addLiquidityFee,
-        uint256 _removeLiquidityFee,
-        uint256 _stakeFee,
-        uint256 _unstakeFee,
+        address _pairFactoryContract,
+        FeeStruct memory _feeStruct,
         address _swapContract,
         address _router,
-        address _stakingLP
+        address _stakingLP,
+        address _coinWrapper
     ) public initializer {
-        Opportunity._initializeContracts(
+        OpportunityV2._initializeContracts(
             _tokenCrowd,
             _tokenUsdt,
-            _pairCrowdUsdt
+            _pairFactoryContract,
+            _coinWrapper
         );
-        Opportunity._initializeFees(
-            _feeTo,
-            _addLiquidityFee,
-            _removeLiquidityFee,
-            _stakeFee,
-            _unstakeFee
-        );
+        OpportunityV2._initializeFees(_feeStruct);
         swapContract = _swapContract;
         router = IUniswapV2Router02(_router);
         stakingLP = IStakingLP(_stakingLP);
@@ -88,7 +75,7 @@ contract CrowdUsdtLpStakeOpportunity is Opportunity {
     function swap(
         IERC20Upgradeable _fromToken,
         uint256 _amount,
-        bytes calldata _data
+        bytes memory _data
     ) internal override returns (uint256) {
         address _swapContract = swapContract; // gas savings
         if (!_fromToken.isETH()) {
@@ -108,16 +95,17 @@ contract CrowdUsdtLpStakeOpportunity is Opportunity {
         IUniswapV2Router02 _router = router; // gas savings
         tokenA.uniApprove(address(_router), _addLiqDescriptor.amountADesired);
         tokenB.uniApprove(address(_router), _addLiqDescriptor.amountBDesired);
-        return _router.addLiquidity(
-            address(tokenA),
-            address(tokenB),
-            _addLiqDescriptor.amountADesired,
-            _addLiqDescriptor.amountBDesired,
-            _addLiqDescriptor.amountAMin,
-            _addLiqDescriptor.amountBMin,
-            address(this),
-            _addLiqDescriptor.deadline
-        );
+        return
+            _router.addLiquidity(
+                address(tokenA),
+                address(tokenB),
+                _addLiqDescriptor.amountADesired,
+                _addLiqDescriptor.amountBDesired,
+                _addLiqDescriptor.amountAMin,
+                _addLiqDescriptor.amountBMin,
+                address(this),
+                _addLiqDescriptor.deadline
+            );
     }
 
     function removeLiquidity(
@@ -125,15 +113,32 @@ contract CrowdUsdtLpStakeOpportunity is Opportunity {
     ) internal override returns (uint256, uint256) {
         IUniswapV2Router02 _router = router; // gas savings
         pair.uniApprove(address(_router), _removeLiqDescriptor.amount);
-        return _router.removeLiquidity(
-            address(tokenA),
-            address(tokenB),
-            _removeLiqDescriptor.amount,
-            _removeLiqDescriptor.amountAMin,
-            _removeLiqDescriptor.amountBMin,
-            _removeLiqDescriptor.receiverAccount,
-            _removeLiqDescriptor.deadline
-        );
+        return
+            address(tokenA) == address(coinWrapper) ||
+                address(tokenB) == address(coinWrapper)
+                ? _router.removeLiquidityETH(
+                    address(tokenA) == address(coinWrapper)
+                        ? address(tokenB)
+                        : address(tokenA),
+                    _removeLiqDescriptor.amount,
+                    address(tokenA) == address(coinWrapper)
+                        ? _removeLiqDescriptor.amountBMin
+                        : _removeLiqDescriptor.amountAMin,
+                    address(tokenA) == address(coinWrapper)
+                        ? _removeLiqDescriptor.amountAMin
+                        : _removeLiqDescriptor.amountBMin,
+                    _removeLiqDescriptor.receiverAccount,
+                    _removeLiqDescriptor.deadline
+                )
+                : _router.removeLiquidity(
+                    address(tokenA),
+                    address(tokenB),
+                    _removeLiqDescriptor.amount,
+                    _removeLiqDescriptor.amountAMin,
+                    _removeLiqDescriptor.amountBMin,
+                    _removeLiqDescriptor.receiverAccount,
+                    _removeLiqDescriptor.deadline
+                );
     }
 
     function stake(address _userAddress, uint256 _amount) internal override {
@@ -147,11 +152,13 @@ contract CrowdUsdtLpStakeOpportunity is Opportunity {
     ) internal override returns (uint256, uint256) {
         IERC20Upgradeable _tokenA = tokenA; // gas savings
         uint256 _beforeBalanceReward = _tokenA.uniBalanceOf(address(this));
-        (uint256 _amountLP, uint256 _rewards) = stakingLP.withdraw(_amount, msg.sender);
+        (uint256 _amountLP, uint256 _rewards) = stakingLP.withdraw(
+            _amount,
+            msg.sender
+        );
         require(_amountLP == _amount, "oe15");
         uint256 _afterBalanceReward = _tokenA.uniBalanceOf(address(this));
         require(_afterBalanceReward - _beforeBalanceReward == _rewards, "oe09");
         return (_amountLP, _rewards);
     }
-
 }

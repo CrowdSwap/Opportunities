@@ -20,6 +20,7 @@ const tokenFixture: Fixture<{
   USDT: ERC20PresetMinterPauser;
   DAI: ERC20PresetMinterPauser;
   MATIC: Address;
+  WMATIC: ERC20PresetMinterPauser;
 }> = async ([wallet], provider) => {
   const signer = provider.getSigner(wallet.address);
   return {
@@ -35,6 +36,12 @@ const tokenFixture: Fixture<{
       "DAI minter",
       "DAI"
     ),
+
+    WMATIC: await new ERC20PresetMinterPauser__factory(signer).deploy(
+      "WMATIC minter",
+      "WMATIC"
+    ),
+
     MATIC: Address.fromString("0x0000000000000000000000000000000000001010"),
   };
 };
@@ -51,7 +58,10 @@ export const stakingLpFixture: Fixture<{
 }> = async ([wallet, revenue], provider) => {
   const signer = await ethers.getSigner(wallet.address);
 
-  const { CROWD, USDT, DAI, MATIC } = await tokenFixture([wallet], provider);
+  const { CROWD, USDT, DAI, MATIC, WMATIC } = await tokenFixture(
+    [wallet],
+    provider
+  );
 
   const factory = await new UniswapV2FactoryTest__factory(signer).deploy();
   await factory.createPair(CROWD.address, USDT.address);
@@ -65,7 +75,8 @@ export const stakingLpFixture: Fixture<{
   );
 
   const quickswap = await new UniswapV2Router02Test__factory(signer).deploy(
-    factory.address
+    factory.address,
+    WMATIC.address
   );
   const crowdswapV1 = await new CrowdswapV1Test__factory(signer).deploy([
     { flag: 0x08, adr: quickswap.address },
@@ -120,7 +131,7 @@ export const stakingLpFixture: Fixture<{
     [
       CROWD.address,
       USDT.address,
-      crowdUsdtPairAddress,
+      factory.address,
       revenue.address,
       fee,
       fee,
