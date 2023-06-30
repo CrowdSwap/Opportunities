@@ -28,7 +28,7 @@ contract BeefyMimaticUsdcOpportunityV2 is OpportunityV2 {
      * @dev The contract constructor
      * @param _tokenMimatic The address of the MIM token
      * @param _tokenUsdc The address of the USDC token
-     * @param _pairFactoryContract The address of the pair USDC/MIMATIC
+     * @param _pairFactoryContract The address of the dex's factory
      * @param _feeStruct Parameters needed for fee
      * @param _swapContract The address of the CrowdSwap Swap Contract
      * @param _router The address of the QuickSwap Router Contract

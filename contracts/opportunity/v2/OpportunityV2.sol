@@ -71,6 +71,8 @@ abstract contract OpportunityV2 is
      * @member removeLiquidityFee The initial fee of Remove Liquidity step
      * @member stakeFee The initial fee of Stake step
      * @member unstakeFee The initial fee of Unstake step
+     * @member dexFee The initial fee of dexes
+     * @member aggregatorFee The initial fee of the aggregator
      */
     struct FeeStruct {
         address payable feeTo;
@@ -194,8 +196,8 @@ abstract contract OpportunityV2 is
     /**
      * @dev tokenA and tokenB are received
      * @param _userAddress The address of the user
-     * @param _amountA The recieved amount of token A
-     * @param _amountB  The recieved amount of token B
+     * @param _amountA The received amount of token A
+     * @param _amountB  The received amount of token B
      * @param _addLiquidityDeadline Unix timestamp after which the addLiquidity will revert
      */
     function investByTokenATokenB(
@@ -247,7 +249,7 @@ abstract contract OpportunityV2 is
     /**
      * @dev Only token A is received
      * @param _userAddress The address of the user
-     * @param _amount The recieved amount of token A
+     * @param _amount The received amount of token A
      * @param _dexDescriptor The description of dex that swap tokenA-->tokenB should be done through that
      * @param _addLiquidityDeadline Unix timestamp after which the addLiquidity will revert
      */
@@ -319,7 +321,7 @@ abstract contract OpportunityV2 is
     /**
      * @dev Only token B is received
      * @param _userAddress The address of the user
-     * @param _amount The recieved amount of token B
+     * @param _amount The received amount of token B
      * @param _dexDescriptor The description of dex that swap tokenB-->tokenA should be done through that
      * @param _addLiquidityDeadline Unix timestamp after which the addLiquidity will revert
      */
@@ -412,7 +414,7 @@ abstract contract OpportunityV2 is
                 _token != _tokenB &&
                 (address(coinWrapper) == address(0) || !_token.isETH()),
             "oexxx1 IDENTICAL_ADDRESSES"
-        ); //todo BLOC-1401 change in the test
+        );
 
         if (_token.isETH()) {
             require(msg.value >= _amount, "oe03");

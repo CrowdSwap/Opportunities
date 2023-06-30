@@ -150,36 +150,6 @@ describe("StakingLP", async () => {
         .withArgs(userAccount.address, amountLP);
       expect(await stakingLP.balanceOf(userAccount.address)).to.equal(amountLP);
     });
-
-    it.skip("ResonateAdapter should be able to stake", async () => {
-      const { stakingLP, crowdUsdtPair } = await loadFixture(stakingLpFixture);
-
-      const tx = await owner.sendTransaction({
-        to: "0x127F6e566212d3477b34725C9D1a422d6D960c97",
-        value: ethers.utils.parseEther("10"),
-      });
-      await tx.wait();
-
-      const amountLP = ethers.utils.parseEther("1");
-      const resonateAdapter = await mintAndApprove(
-        crowdUsdtPair,
-        amountLP,
-        "0x127F6e566212d3477b34725C9D1a422d6D960c97",
-        stakingLP
-      );
-
-      expect(await stakingLP.balanceOf(resonateAdapter.address)).to.equal(0);
-      await expect(
-        stakingLP
-          .connect(resonateAdapter)
-          .stakeLP(amountLP, resonateAdapter.address)
-      )
-        .to.emit(stakingLP, "LPStaked")
-        .withArgs(resonateAdapter.address, amountLP);
-      expect(await stakingLP.balanceOf(resonateAdapter.address)).to.equal(
-        amountLP
-      );
-    });
   });
 
   describe("withdrawRewards", async () => {

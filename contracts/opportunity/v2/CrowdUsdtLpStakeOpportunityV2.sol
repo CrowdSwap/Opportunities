@@ -26,7 +26,7 @@ contract CrowdUsdtLpStakeOpportunityV2 is OpportunityV2 {
      * @dev The contract constructor
      * @param _tokenCrowd The address of the CROWD token
      * @param _tokenUsdt The address of the USDT token
-     * @param _pairFactoryContract The address of the pair USDT/CROWD
+     * @param _pairFactoryContract The address of the dex's factory
      * @param _feeStruct Parameters needed for fee
      * @param _swapContract The address of the CrowdSwap Swap Contract
      * @param _router The address of the QuickSwap Router Contract

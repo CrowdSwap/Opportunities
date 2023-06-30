@@ -44,7 +44,7 @@ contract PancakeOpportunityV2 is OpportunityV2, ReentrancyGuardUpgradeable {
      * @param _tokenA The address of the A token
      * @param _tokenB The address of the B token
      * @param _rewardToken The address of the reward token
-     * @param _pairFactoryContract The address of the pair
+     * @param _pairFactoryContract The address of the dex's factory
      * @param _feeStruct Parameters needed for fee
      * @param _swapContract The address of the CrowdSwap Swap Contract
      * @param _router The address of the PancakeSwap: Router v2 Contract
