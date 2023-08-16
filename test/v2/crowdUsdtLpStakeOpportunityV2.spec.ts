@@ -862,6 +862,18 @@ describe("CrowdUsdtLpStakeOpportunity", async () => {
           )
         ).to.be.revertedWith("oe12");
       });
+
+      it("Should fail when user address is zero in investByLP function", async () => {
+        const { crowdUsdtOpportunity: opportunity } = await loadFixture(
+          crowdUsdtLpStakeOpportunityFixtureV2
+        );
+
+        const amountLP = ethers.utils.parseEther("100");
+
+        await expect(
+          opportunity.investByLP(AddressZero, amountLP)
+        ).to.be.revertedWith("oe12");
+      });
     });
 
     describe("token/coin pair", async () => {
