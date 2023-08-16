@@ -14,12 +14,14 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 
 abstract contract OpportunityV2 is
     Initializable,
     UUPSUpgradeable,
     PausableUpgradeable,
-    OwnableUpgradeable
+    OwnableUpgradeable,
+    ReentrancyGuardUpgradeable
 {
     using UniERC20Upgradeable for IERC20Upgradeable;
     using SafeERC20Upgradeable for IERC20Upgradeable;
@@ -205,7 +207,7 @@ abstract contract OpportunityV2 is
         uint256 _amountA,
         uint256 _amountB,
         uint256 _addLiquidityDeadline
-    ) external payable whenNotPaused refund(_userAddress) {
+    ) external payable whenNotPaused nonReentrant refund(_userAddress) {
         IERC20Upgradeable _tokenA = tokenA; // gas savings
         IERC20Upgradeable _tokenB = tokenB; // gas savings
         FeeStruct memory _feeStruct = feeStruct; // gas savings
@@ -258,7 +260,7 @@ abstract contract OpportunityV2 is
         uint256 _amount,
         DexDescriptor memory _dexDescriptor,
         uint256 _addLiquidityDeadline
-    ) external payable whenNotPaused refund(_userAddress) {
+    ) external payable whenNotPaused nonReentrant refund(_userAddress) {
         IERC20Upgradeable _tokenA = tokenA; // gas savings
         IERC20Upgradeable _tokenB = tokenB; // gas savings
         FeeStruct memory _feeStruct = feeStruct; // gas savings
@@ -330,7 +332,7 @@ abstract contract OpportunityV2 is
         uint256 _amount,
         DexDescriptor memory _dexDescriptor,
         uint256 _addLiquidityDeadline
-    ) external payable whenNotPaused refund(_userAddress) {
+    ) external payable whenNotPaused nonReentrant refund(_userAddress) {
         IERC20Upgradeable _tokenA = tokenA; // gas savings
         IERC20Upgradeable _tokenB = tokenB; // gas savings
         FeeStruct memory _feeStruct = feeStruct; // gas savings
@@ -403,7 +405,7 @@ abstract contract OpportunityV2 is
         DexDescriptor memory _dexDescriptorB,
         DexDescriptor memory _dexDescriptorA,
         uint256 _deadline
-    ) external payable whenNotPaused refund(_userAddress) {
+    ) external payable whenNotPaused nonReentrant refund(_userAddress) {
         IERC20Upgradeable _tokenA = tokenA; // gas savings
         IERC20Upgradeable _tokenB = tokenB; // gas savings
         FeeStruct memory _feeStruct = feeStruct; // gas savings
@@ -494,7 +496,7 @@ abstract contract OpportunityV2 is
      */
     function leave(
         RemoveLiqDescriptor memory _removeLiqDescriptor
-    ) external whenNotPaused {
+    ) external whenNotPaused nonReentrant{
         FeeStruct memory _feeStruct = feeStruct; // gas savings
         (uint256 _amountLP, uint256 _rewards) = _unstake(
             _removeLiqDescriptor.amount
@@ -596,7 +598,7 @@ abstract contract OpportunityV2 is
         address _token,
         uint256 _amount,
         address payable _receiver
-    ) external onlyOwner {
+    ) external nonReentrant onlyOwner {
         IERC20Upgradeable(_token).uniTransfer(_receiver, _amount);
         emit WithdrawnFunds(_token, _amount, _receiver);
     }
@@ -835,7 +837,10 @@ abstract contract OpportunityV2 is
         if (_amount <= 0) return;
         if (address(_token) == address(coinWrapper)) {
             coinWrapper.withdraw(_amount);
-            payable(_userAddress).transfer(_amount);
+            (bool success, ) = payable(_userAddress).call{value: _amount}(
+                new bytes(0)
+            );
+            require(success, "ce11");
         } else {
             _token.uniTransfer(payable(_userAddress), _amount);
         }
