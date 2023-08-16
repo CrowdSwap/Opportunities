@@ -208,6 +208,7 @@ abstract contract OpportunityV2 is
         uint256 _amountB,
         uint256 _addLiquidityDeadline
     ) external payable whenNotPaused nonReentrant refund(_userAddress) {
+        require(_userAddress != address(0), "oe12");
         IERC20Upgradeable _tokenA = tokenA; // gas savings
         IERC20Upgradeable _tokenB = tokenB; // gas savings
         FeeStruct memory _feeStruct = feeStruct; // gas savings
@@ -261,6 +262,7 @@ abstract contract OpportunityV2 is
         DexDescriptor memory _dexDescriptor,
         uint256 _addLiquidityDeadline
     ) external payable whenNotPaused nonReentrant refund(_userAddress) {
+        require(_userAddress != address(0), "oe12");
         IERC20Upgradeable _tokenA = tokenA; // gas savings
         IERC20Upgradeable _tokenB = tokenB; // gas savings
         FeeStruct memory _feeStruct = feeStruct; // gas savings
@@ -333,6 +335,7 @@ abstract contract OpportunityV2 is
         DexDescriptor memory _dexDescriptor,
         uint256 _addLiquidityDeadline
     ) external payable whenNotPaused nonReentrant refund(_userAddress) {
+        require(_userAddress != address(0), "oe12");
         IERC20Upgradeable _tokenA = tokenA; // gas savings
         IERC20Upgradeable _tokenB = tokenB; // gas savings
         FeeStruct memory _feeStruct = feeStruct; // gas savings
@@ -406,6 +409,7 @@ abstract contract OpportunityV2 is
         DexDescriptor memory _dexDescriptorA,
         uint256 _deadline
     ) external payable whenNotPaused nonReentrant refund(_userAddress) {
+        require(_userAddress != address(0), "oe12");
         IERC20Upgradeable _tokenA = tokenA; // gas savings
         IERC20Upgradeable _tokenB = tokenB; // gas savings
         FeeStruct memory _feeStruct = feeStruct; // gas savings
@@ -481,6 +485,7 @@ abstract contract OpportunityV2 is
         address _userAddress,
         uint256 _amountLP
     ) external whenNotPaused {
+        require(_userAddress != address(0), "oe12");
         _transferFrom(pair, _amountLP);
 
         emit InvestedByLP(_userAddress, _amountLP);
@@ -497,6 +502,7 @@ abstract contract OpportunityV2 is
     function leave(
         RemoveLiqDescriptor memory _removeLiqDescriptor
     ) external whenNotPaused nonReentrant{
+        require(_removeLiqDescriptor.receiverAccount != address(0), "oe12");
         FeeStruct memory _feeStruct = feeStruct; // gas savings
         (uint256 _amountLP, uint256 _rewards) = _unstake(
             _removeLiqDescriptor.amount
@@ -599,6 +605,7 @@ abstract contract OpportunityV2 is
         uint256 _amount,
         address payable _receiver
     ) external nonReentrant onlyOwner {
+        require(_receiver != address(0), "oe12");
         IERC20Upgradeable(_token).uniTransfer(_receiver, _amount);
         emit WithdrawnFunds(_token, _amount, _receiver);
     }
