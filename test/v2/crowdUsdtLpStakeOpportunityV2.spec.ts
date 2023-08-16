@@ -15,8 +15,14 @@ describe("CrowdUsdtLpStakeOpportunity", async () => {
   let owner, revenue, account1, user, liquidityProvider1, liquidityProvider2;
 
   before(async () => {
-    [owner, revenue, account1, user, liquidityProvider1, liquidityProvider2] =
-      await ethers.getSigners();
+    [
+      owner,
+      revenue,
+      account1,
+      user,
+      liquidityProvider1,
+      liquidityProvider2,
+    ] = await ethers.getSigners();
     loadFixture = waffle.createFixtureLoader(
       [owner, revenue, liquidityProvider1, liquidityProvider2],
       <any>ethers.provider
@@ -50,14 +56,13 @@ describe("CrowdUsdtLpStakeOpportunity", async () => {
           await tokenB.decimals()
         );
 
-        const swapTx =
-          await uniswapV2.populateTransaction.swapExactTokensForTokens(
-            swapAmountIn,
-            swapMinAmountOut,
-            [tokenA.address, tokenB.address],
-            await opportunity.swapContract(),
-            (await ethers.provider.getBlock("latest")).timestamp + 100000
-          );
+        const swapTx = await uniswapV2.populateTransaction.swapExactTokensForTokens(
+          swapAmountIn,
+          swapMinAmountOut,
+          [tokenA.address, tokenB.address],
+          await opportunity.swapContract(),
+          (await ethers.provider.getBlock("latest")).timestamp + 100000
+        );
         const dexDescriptor = dexDescriptorFromTransaction(swapTx, "UniswapV2");
         const oppTx = await opportunity.investByTokenA(
           user.address,
@@ -180,14 +185,13 @@ describe("CrowdUsdtLpStakeOpportunity", async () => {
           await tokenA.decimals()
         );
 
-        const swapTx =
-          await uniswapV2.populateTransaction.swapExactTokensForTokens(
-            swapAmountIn,
-            swapMinAmountOut,
-            [tokenB.address, tokenA.address],
-            await opportunity.swapContract(),
-            (await ethers.provider.getBlock("latest")).timestamp + 100000
-          );
+        const swapTx = await uniswapV2.populateTransaction.swapExactTokensForTokens(
+          swapAmountIn,
+          swapMinAmountOut,
+          [tokenB.address, tokenA.address],
+          await opportunity.swapContract(),
+          (await ethers.provider.getBlock("latest")).timestamp + 100000
+        );
         const dexDescriptor = dexDescriptorFromTransaction(swapTx, "UniswapV2");
         const oppTx = await opportunity.investByTokenB(
           user.address,
@@ -398,14 +402,13 @@ describe("CrowdUsdtLpStakeOpportunity", async () => {
           "40",
           await tokenB.decimals()
         );
-        const swap1Tx =
-          await uniswapV2.populateTransaction.swapExactTokensForTokens(
-            swap1AmountIn,
-            swap1MinAmountOut,
-            [tokenC.address, tokenB.address],
-            await opportunity.swapContract(),
-            (await ethers.provider.getBlock("latest")).timestamp + 100000
-          );
+        const swap1Tx = await uniswapV2.populateTransaction.swapExactTokensForTokens(
+          swap1AmountIn,
+          swap1MinAmountOut,
+          [tokenC.address, tokenB.address],
+          await opportunity.swapContract(),
+          (await ethers.provider.getBlock("latest")).timestamp + 100000
+        );
         const dexDescriptor1 = dexDescriptorFromTransaction(
           swap1Tx,
           "UniswapV2"
@@ -420,14 +423,13 @@ describe("CrowdUsdtLpStakeOpportunity", async () => {
           "40",
           await tokenA.decimals()
         );
-        const swap2Tx =
-          await uniswapV2.populateTransaction.swapExactTokensForTokens(
-            swap2AmountIn,
-            swap2MinAmountOut,
-            [tokenB.address, tokenA.address],
-            await opportunity.swapContract(),
-            (await ethers.provider.getBlock("latest")).timestamp + 100000
-          );
+        const swap2Tx = await uniswapV2.populateTransaction.swapExactTokensForTokens(
+          swap2AmountIn,
+          swap2MinAmountOut,
+          [tokenB.address, tokenA.address],
+          await opportunity.swapContract(),
+          (await ethers.provider.getBlock("latest")).timestamp + 100000
+        );
         const dexDescriptor2 = dexDescriptorFromTransaction(
           swap2Tx,
           "UniswapV2"
@@ -556,14 +558,13 @@ describe("CrowdUsdtLpStakeOpportunity", async () => {
           "40",
           await tokenB.decimals()
         );
-        const swap1Tx =
-          await uniswapV2.populateTransaction.swapExactTokensForTokens(
-            swap1AmountIn,
-            swap1MinAmountOut,
-            [tokenC.address, tokenB.address],
-            await opportunity.swapContract(),
-            (await ethers.provider.getBlock("latest")).timestamp + 100000
-          );
+        const swap1Tx = await uniswapV2.populateTransaction.swapExactTokensForTokens(
+          swap1AmountIn,
+          swap1MinAmountOut,
+          [tokenC.address, tokenB.address],
+          await opportunity.swapContract(),
+          (await ethers.provider.getBlock("latest")).timestamp + 100000
+        );
         const dexDescriptor1 = dexDescriptorFromTransaction(
           swap1Tx,
           "UniswapV2"
@@ -578,14 +579,13 @@ describe("CrowdUsdtLpStakeOpportunity", async () => {
           "40",
           await tokenA.decimals()
         );
-        const swap2Tx =
-          await uniswapV2.populateTransaction.swapExactTokensForTokens(
-            swap2AmountIn,
-            swap2MinAmountOut,
-            [tokenB.address, tokenA.address],
-            await opportunity.swapContract(),
-            (await ethers.provider.getBlock("latest")).timestamp + 100000
-          );
+        const swap2Tx = await uniswapV2.populateTransaction.swapExactTokensForTokens(
+          swap2AmountIn,
+          swap2MinAmountOut,
+          [tokenB.address, tokenA.address],
+          await opportunity.swapContract(),
+          (await ethers.provider.getBlock("latest")).timestamp + 100000
+        );
         const dexDescriptor2 = dexDescriptorFromTransaction(
           swap2Tx,
           "UniswapV2"
@@ -601,6 +601,7 @@ describe("CrowdUsdtLpStakeOpportunity", async () => {
           )
         ).to.revertedWith("oexxx1 IDENTICAL_ADDRESSES");
       });
+
       it("Should fail when token B is sent to investByToken function", async () => {
         const {
           crowdUsdtOpportunity: opportunity,
@@ -627,14 +628,13 @@ describe("CrowdUsdtLpStakeOpportunity", async () => {
           "40",
           await tokenB.decimals()
         );
-        const swap1Tx =
-          await uniswapV2.populateTransaction.swapExactTokensForTokens(
-            swap1AmountIn,
-            swap1MinAmountOut,
-            [tokenC.address, tokenB.address],
-            await opportunity.swapContract(),
-            (await ethers.provider.getBlock("latest")).timestamp + 100000
-          );
+        const swap1Tx = await uniswapV2.populateTransaction.swapExactTokensForTokens(
+          swap1AmountIn,
+          swap1MinAmountOut,
+          [tokenC.address, tokenB.address],
+          await opportunity.swapContract(),
+          (await ethers.provider.getBlock("latest")).timestamp + 100000
+        );
         const dexDescriptor1 = dexDescriptorFromTransaction(
           swap1Tx,
           "UniswapV2"
@@ -649,14 +649,13 @@ describe("CrowdUsdtLpStakeOpportunity", async () => {
           "40",
           await tokenA.decimals()
         );
-        const swap2Tx =
-          await uniswapV2.populateTransaction.swapExactTokensForTokens(
-            swap2AmountIn,
-            swap2MinAmountOut,
-            [tokenB.address, tokenA.address],
-            await opportunity.swapContract(),
-            (await ethers.provider.getBlock("latest")).timestamp + 100000
-          );
+        const swap2Tx = await uniswapV2.populateTransaction.swapExactTokensForTokens(
+          swap2AmountIn,
+          swap2MinAmountOut,
+          [tokenB.address, tokenA.address],
+          await opportunity.swapContract(),
+          (await ethers.provider.getBlock("latest")).timestamp + 100000
+        );
         const dexDescriptor2 = dexDescriptorFromTransaction(
           swap2Tx,
           "UniswapV2"
@@ -672,6 +671,196 @@ describe("CrowdUsdtLpStakeOpportunity", async () => {
             (await ethers.provider.getBlock("latest")).timestamp + 100000
           )
         ).to.revertedWith("oexxx1 IDENTICAL_ADDRESSES");
+      });
+
+      it("Should fail when user address is zero in investByTokenA function", async () => {
+        const {
+          crowdUsdtOpportunity: opportunity,
+          CROWD: tokenA,
+          USDT: tokenB,
+          uniswapV2,
+        } = await loadFixture(crowdUsdtLpStakeOpportunityFixtureV2);
+        const amountIn = ethers.utils.parseUnits(
+          "4000",
+          await tokenA.decimals()
+        );
+
+        await tokenA.mint(owner.address, amountIn);
+        await tokenA.approve(opportunity.address, amountIn);
+
+        //It would be replaced in the contract
+        const swapAmountIn = ethers.utils.parseUnits(
+          "1",
+          await tokenA.decimals()
+        );
+        const swapMinAmountOut = ethers.utils.parseUnits(
+          "40",
+          await tokenB.decimals()
+        );
+
+        const swapTx = await uniswapV2.populateTransaction.swapExactTokensForTokens(
+          swapAmountIn,
+          swapMinAmountOut,
+          [tokenA.address, tokenB.address],
+          await opportunity.swapContract(),
+          (await ethers.provider.getBlock("latest")).timestamp + 100000
+        );
+        const dexDescriptor = dexDescriptorFromTransaction(swapTx, "UniswapV2");
+        await expect(
+          opportunity.investByTokenA(
+            AddressZero,
+            amountIn,
+            dexDescriptor,
+            (await ethers.provider.getBlock("latest")).timestamp + 100000
+          )
+        ).to.be.revertedWith("oe12");
+      });
+
+      it("Should fail when user address is zero in investByTokenB function", async () => {
+        const {
+          crowdUsdtOpportunity: opportunity,
+          CROWD: tokenA,
+          USDT: tokenB,
+          uniswapV2,
+        } = await loadFixture(crowdUsdtLpStakeOpportunityFixtureV2);
+
+        const amountIn = ethers.utils.parseUnits(
+          "100",
+          await tokenB.decimals()
+        );
+
+        await tokenB.mint(owner.address, amountIn);
+        await tokenB.approve(opportunity.address, amountIn);
+
+        //It would be replaced in the contract
+        const swapAmountIn = ethers.utils.parseUnits(
+          "0",
+          await tokenB.decimals()
+        );
+        const swapMinAmountOut = ethers.utils.parseUnits(
+          "40",
+          await tokenA.decimals()
+        );
+
+        const swapTx = await uniswapV2.populateTransaction.swapExactTokensForTokens(
+          swapAmountIn,
+          swapMinAmountOut,
+          [tokenB.address, tokenA.address],
+          await opportunity.swapContract(),
+          (await ethers.provider.getBlock("latest")).timestamp + 100000
+        );
+        const dexDescriptor = dexDescriptorFromTransaction(swapTx, "UniswapV2");
+        await expect(
+          opportunity.investByTokenB(
+            AddressZero,
+            amountIn,
+            dexDescriptor,
+            (await ethers.provider.getBlock("latest")).timestamp + 100000
+          )
+        ).to.be.revertedWith("oe12");
+      });
+
+      it("Should fail when user address is zero in investByTokenATokenB function", async () => {
+        const {
+          crowdUsdtOpportunity: opportunity,
+          CROWD: tokenA,
+          USDT: tokenB,
+        } = await loadFixture(crowdUsdtLpStakeOpportunityFixtureV2);
+
+        const amountA = ethers.utils.parseUnits(
+          "2000",
+          await tokenA.decimals()
+        );
+        const amountB = ethers.utils.parseUnits(
+          "100.401606", //(100*(1000/996) tokens B should be available after deducting fee
+          await tokenB.decimals()
+        );
+
+        await tokenA.mint(owner.address, amountA);
+        await tokenA.approve(opportunity.address, amountA);
+
+        await tokenB.mint(owner.address, amountB);
+        await tokenB.approve(opportunity.address, amountB);
+
+        await expect(
+          opportunity.investByTokenATokenB(
+            AddressZero,
+            amountA,
+            amountB,
+            (await ethers.provider.getBlock("latest")).timestamp + 100000
+          )
+        ).to.be.revertedWith("oe12");
+      });
+
+      it("Should fail when user address is zero in investToken function", async () => {
+        const {
+          crowdUsdtOpportunity: opportunity,
+          CROWD: tokenA,
+          USDT: tokenB,
+          DAI: tokenC,
+          uniswapV2,
+        } = await loadFixture(crowdUsdtLpStakeOpportunityFixtureV2);
+
+        const amountIn = ethers.utils.parseUnits(
+          "100",
+          await tokenC.decimals()
+        );
+
+        await tokenC.mint(owner.address, amountIn);
+        await tokenC.approve(opportunity.address, amountIn);
+
+        //It would be replaced in the contract
+        const swap1AmountIn = ethers.utils.parseUnits(
+          "0",
+          await tokenC.decimals()
+        );
+        const swap1MinAmountOut = ethers.utils.parseUnits(
+          "40",
+          await tokenB.decimals()
+        );
+        const swap1Tx = await uniswapV2.populateTransaction.swapExactTokensForTokens(
+          swap1AmountIn,
+          swap1MinAmountOut,
+          [tokenC.address, tokenB.address],
+          await opportunity.swapContract(),
+          (await ethers.provider.getBlock("latest")).timestamp + 100000
+        );
+        const dexDescriptor1 = dexDescriptorFromTransaction(
+          swap1Tx,
+          "UniswapV2"
+        );
+
+        //It would be replaced in the contract
+        const swap2AmountIn = ethers.utils.parseUnits(
+          "0",
+          await tokenB.decimals()
+        );
+        const swap2MinAmountOut = ethers.utils.parseUnits(
+          "40",
+          await tokenA.decimals()
+        );
+        const swap2Tx = await uniswapV2.populateTransaction.swapExactTokensForTokens(
+          swap2AmountIn,
+          swap2MinAmountOut,
+          [tokenB.address, tokenA.address],
+          await opportunity.swapContract(),
+          (await ethers.provider.getBlock("latest")).timestamp + 100000
+        );
+        const dexDescriptor2 = dexDescriptorFromTransaction(
+          swap2Tx,
+          "UniswapV2"
+        );
+
+        await expect(
+          opportunity.investByToken(
+            AddressZero,
+            tokenC.address,
+            amountIn,
+            dexDescriptor1,
+            dexDescriptor2,
+            (await ethers.provider.getBlock("latest")).timestamp + 100000
+          )
+        ).to.be.revertedWith("oe12");
       });
     });
 
@@ -699,14 +888,13 @@ describe("CrowdUsdtLpStakeOpportunity", async () => {
           await tokenB.decimals()
         );
 
-        const swapTx =
-          await uniswapV2.populateTransaction.swapExactTokensForTokens(
-            swapAmountIn,
-            swapMinAmountOut,
-            [tokenA.address, tokenB.address],
-            await opportunity.swapContract(),
-            (await ethers.provider.getBlock("latest")).timestamp + 100000
-          );
+        const swapTx = await uniswapV2.populateTransaction.swapExactTokensForTokens(
+          swapAmountIn,
+          swapMinAmountOut,
+          [tokenA.address, tokenB.address],
+          await opportunity.swapContract(),
+          (await ethers.provider.getBlock("latest")).timestamp + 100000
+        );
         const dexDescriptor = dexDescriptorFromTransaction(swapTx, "UniswapV2");
         const oppTx = await opportunity.investByTokenA(
           user.address,
@@ -826,14 +1014,13 @@ describe("CrowdUsdtLpStakeOpportunity", async () => {
           await tokenA.decimals()
         );
 
-        const swapTx =
-          await uniswapV2.populateTransaction.swapExactTokensForTokens(
-            swapAmountIn,
-            swapMinAmountOut,
-            [tokenB.address, tokenA.address],
-            await opportunity.swapContract(),
-            (await ethers.provider.getBlock("latest")).timestamp + 100000
-          );
+        const swapTx = await uniswapV2.populateTransaction.swapExactTokensForTokens(
+          swapAmountIn,
+          swapMinAmountOut,
+          [tokenB.address, tokenA.address],
+          await opportunity.swapContract(),
+          (await ethers.provider.getBlock("latest")).timestamp + 100000
+        );
         const dexDescriptor = dexDescriptorFromTransaction(swapTx, "UniswapV2");
         const oppTx = await opportunity.investByTokenB(
           user.address,
@@ -947,14 +1134,13 @@ describe("CrowdUsdtLpStakeOpportunity", async () => {
           "40",
           await tokenB.decimals()
         );
-        const swap1Tx =
-          await uniswapV2.populateTransaction.swapExactTokensForTokens(
-            swap1AmountIn,
-            swap1MinAmountOut,
-            [tokenC.address, tokenB.address],
-            await opportunity.swapContract(),
-            (await ethers.provider.getBlock("latest")).timestamp + 100000
-          );
+        const swap1Tx = await uniswapV2.populateTransaction.swapExactTokensForTokens(
+          swap1AmountIn,
+          swap1MinAmountOut,
+          [tokenC.address, tokenB.address],
+          await opportunity.swapContract(),
+          (await ethers.provider.getBlock("latest")).timestamp + 100000
+        );
         const dexDescriptor1 = dexDescriptorFromTransaction(
           swap1Tx,
           "UniswapV2"
@@ -969,14 +1155,13 @@ describe("CrowdUsdtLpStakeOpportunity", async () => {
           "40",
           await tokenA.decimals()
         );
-        const swap2Tx =
-          await uniswapV2.populateTransaction.swapExactTokensForTokens(
-            swap2AmountIn,
-            swap2MinAmountOut,
-            [tokenB.address, tokenA.address],
-            await opportunity.swapContract(),
-            (await ethers.provider.getBlock("latest")).timestamp + 100000
-          );
+        const swap2Tx = await uniswapV2.populateTransaction.swapExactTokensForTokens(
+          swap2AmountIn,
+          swap2MinAmountOut,
+          [tokenB.address, tokenA.address],
+          await opportunity.swapContract(),
+          (await ethers.provider.getBlock("latest")).timestamp + 100000
+        );
         const dexDescriptor2 = dexDescriptorFromTransaction(
           swap2Tx,
           "UniswapV2"
@@ -1095,14 +1280,13 @@ describe("CrowdUsdtLpStakeOpportunity", async () => {
           await tokenB.decimals()
         );
 
-        const swap1Tx =
-          await uniswapV2.populateTransaction.swapExactTokensForTokens(
-            "0",
-            swap1MinAmountOut,
-            [tokenC.address, tokenB.address],
-            await opportunity.swapContract(),
-            (await ethers.provider.getBlock("latest")).timestamp + 100000
-          );
+        const swap1Tx = await uniswapV2.populateTransaction.swapExactTokensForTokens(
+          "0",
+          swap1MinAmountOut,
+          [tokenC.address, tokenB.address],
+          await opportunity.swapContract(),
+          (await ethers.provider.getBlock("latest")).timestamp + 100000
+        );
         const dexDescriptor1 = dexDescriptorFromTransaction(
           swap1Tx,
           "UniswapV2"
@@ -1118,14 +1302,13 @@ describe("CrowdUsdtLpStakeOpportunity", async () => {
           "40",
           await tokenA.decimals()
         );
-        const swap2Tx =
-          await uniswapV2.populateTransaction.swapExactTokensForTokens(
-            swap2AmountIn,
-            swap2MinAmountOut,
-            [tokenB.address, tokenA.address],
-            await opportunity.swapContract(),
-            (await ethers.provider.getBlock("latest")).timestamp + 100000
-          );
+        const swap2Tx = await uniswapV2.populateTransaction.swapExactTokensForTokens(
+          swap2AmountIn,
+          swap2MinAmountOut,
+          [tokenB.address, tokenA.address],
+          await opportunity.swapContract(),
+          (await ethers.provider.getBlock("latest")).timestamp + 100000
+        );
         const dexDescriptor2 = dexDescriptorFromTransaction(
           swap2Tx,
           "UniswapV2"
@@ -1159,13 +1342,12 @@ describe("CrowdUsdtLpStakeOpportunity", async () => {
           await tokenB.decimals()
         );
 
-        const swap1Tx =
-          await uniswapV2.populateTransaction.swapExactETHForTokens(
-            swap1MinAmountOut,
-            [WETH.address, tokenB.address],
-            await opportunity.swapContract(),
-            (await ethers.provider.getBlock("latest")).timestamp + 100000
-          );
+        const swap1Tx = await uniswapV2.populateTransaction.swapExactETHForTokens(
+          swap1MinAmountOut,
+          [WETH.address, tokenB.address],
+          await opportunity.swapContract(),
+          (await ethers.provider.getBlock("latest")).timestamp + 100000
+        );
         const dexDescriptor1 = dexDescriptorFromTransaction(
           swap1Tx,
           "UniswapV2"
@@ -1181,14 +1363,13 @@ describe("CrowdUsdtLpStakeOpportunity", async () => {
           "40",
           await tokenA.decimals()
         );
-        const swap2Tx =
-          await uniswapV2.populateTransaction.swapExactTokensForTokens(
-            swap2AmountIn,
-            swap2MinAmountOut,
-            [tokenB.address, tokenA.address],
-            await opportunity.swapContract(),
-            (await ethers.provider.getBlock("latest")).timestamp + 100000
-          );
+        const swap2Tx = await uniswapV2.populateTransaction.swapExactTokensForTokens(
+          swap2AmountIn,
+          swap2MinAmountOut,
+          [tokenB.address, tokenA.address],
+          await opportunity.swapContract(),
+          (await ethers.provider.getBlock("latest")).timestamp + 100000
+        );
         const dexDescriptor2 = dexDescriptorFromTransaction(
           swap2Tx,
           "UniswapV2"
@@ -1222,13 +1403,12 @@ describe("CrowdUsdtLpStakeOpportunity", async () => {
           await tokenB.decimals()
         );
 
-        const swap1Tx =
-          await uniswapV2.populateTransaction.swapExactETHForTokens(
-            swap1MinAmountOut,
-            [WETH.address, tokenB.address],
-            await opportunity.swapContract(),
-            (await ethers.provider.getBlock("latest")).timestamp + 100000
-          );
+        const swap1Tx = await uniswapV2.populateTransaction.swapExactETHForTokens(
+          swap1MinAmountOut,
+          [WETH.address, tokenB.address],
+          await opportunity.swapContract(),
+          (await ethers.provider.getBlock("latest")).timestamp + 100000
+        );
         const dexDescriptor1 = dexDescriptorFromTransaction(
           swap1Tx,
           "UniswapV2"
@@ -1244,14 +1424,13 @@ describe("CrowdUsdtLpStakeOpportunity", async () => {
           "40",
           await tokenA.decimals()
         );
-        const swap2Tx =
-          await uniswapV2.populateTransaction.swapExactTokensForTokens(
-            swap2AmountIn,
-            swap2MinAmountOut,
-            [tokenB.address, tokenA.address],
-            await opportunity.swapContract(),
-            (await ethers.provider.getBlock("latest")).timestamp + 100000
-          );
+        const swap2Tx = await uniswapV2.populateTransaction.swapExactTokensForTokens(
+          swap2AmountIn,
+          swap2MinAmountOut,
+          [tokenB.address, tokenA.address],
+          await opportunity.swapContract(),
+          (await ethers.provider.getBlock("latest")).timestamp + 100000
+        );
         const dexDescriptor2 = dexDescriptorFromTransaction(
           swap2Tx,
           "UniswapV2"
