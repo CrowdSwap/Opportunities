@@ -14,6 +14,7 @@ import { ethers, upgrades } from "hardhat";
 import { Address } from "ethereumjs-util";
 import { BigNumber, Contract } from "ethers";
 import { getContractAddress } from "ethers/lib/utils";
+import { crowdUsdtLpStakeOpportunityFixtureV2 } from "./v2/crowdUsdtLpStakeOpportunityV2.fixture";
 
 const tokenFixture: Fixture<{
   CROWD: ERC20PresetMinterPauser;
@@ -58,7 +59,7 @@ export const stakingLpFixture: Fixture<{
 }> = async ([wallet, revenue], provider) => {
   const signer = await ethers.getSigner(wallet.address);
 
-  const { CROWD, USDT, DAI, MATIC, WMATIC } = await tokenFixture(
+  const { CROWD, USDT, DAI, MATIC, WMATIC } = await crowdUsdtLpStakeOpportunityFixtureV2(
     [wallet],
     provider
   );
@@ -87,7 +88,7 @@ export const stakingLpFixture: Fixture<{
   const stakingLPProxy = await upgrades.deployProxy(
     stakingLPFactory,
     [
-      crowdUsdtPairAddress,
+      crowdUsdtPair.address,
       CROWD.address,
       200 * 24 * 3600,
       currentTimestamp.timestamp,
@@ -99,7 +100,7 @@ export const stakingLpFixture: Fixture<{
   const stakingLPProxy2 = await upgrades.deployProxy(
     stakingLPFactory,
     [
-      crowdUsdtPairAddress,
+      crowdUsdtPair.address,
       CROWD.address,
       200 * 24 * 3600,
       BigNumber.from(currentTimestamp.timestamp + 5 * 24 * 3600),
