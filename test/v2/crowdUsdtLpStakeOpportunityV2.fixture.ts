@@ -1,5 +1,5 @@
 import { Fixture } from "ethereum-waffle";
-import { Address, zeroAddress } from "ethereumjs-util";
+import { Address } from "ethereumjs-util";
 import { BigNumber, Wallet } from "ethers";
 import { ethers, upgrades } from "hardhat";
 import {
@@ -8,7 +8,6 @@ import {
   CrowdswapV1Test,
   CrowdswapV1Test__factory,
   ERC20PresetMinterPauser,
-  ERC20PresetMinterPauser__factory,
   Erc20Test__factory,
   StakingLP,
   StakingLP__factory,
@@ -264,8 +263,9 @@ export const crowdUsdtLpStakeOpportunityFixtureV2: Fixture<{
     aggregatorFee: aggregatorFee,
   };
 
-  const crowdUsdtOpportunityFactory =
-    new CrowdUsdtLpStakeOpportunityV2__factory(signer);
+  const crowdUsdtOpportunityFactory = new CrowdUsdtLpStakeOpportunityV2__factory(
+    signer
+  );
   const crowdUsdtOpportunity = (await upgrades.deployProxy(
     crowdUsdtOpportunityFactory,
     [
@@ -283,8 +283,9 @@ export const crowdUsdtLpStakeOpportunityFixtureV2: Fixture<{
     }
   )) as CrowdUsdtLpStakeOpportunityV2;
 
-  const crowdWmaticOpportunityFactory =
-    new CrowdUsdtLpStakeOpportunityV2__factory(signer);
+  const crowdWmaticOpportunityFactory = new CrowdUsdtLpStakeOpportunityV2__factory(
+    signer
+  );
   const crowdWmaticOpportunity = (await upgrades.deployProxy(
     crowdWmaticOpportunityFactory,
     [
