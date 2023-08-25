@@ -1,11 +1,11 @@
 import { Fixture } from "ethereum-waffle";
 import { Wallet } from "ethers";
-import { ethers, upgrades } from "hardhat";
+
 import {
-  UniswapV2FactoryTest,
   IUniswapV2Router02,
   IWETH,
   IWETH__factory,
+  UniswapV2FactoryTest,
   UniswapV2FactoryTest__factory,
   UniswapV2Router02Test__factory,
 } from "../../artifacts/types";

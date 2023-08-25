@@ -27,7 +27,8 @@ library UniERC20 {
     function uniTransfer(IERC20 token, address payable to, uint256 amount) internal {
         if (amount > 0) {
             if (isETH(token)) {
-                to.transfer(amount);
+                (bool success,)=to.call{value: amount}(new bytes(0));
+                 require(success, "ce11");
             } else {
                 token.safeTransfer(to, amount);
             }

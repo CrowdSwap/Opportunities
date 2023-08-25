@@ -14,7 +14,7 @@ import "@openzeppelin/contracts-upgradeable/utils/AddressUpgradeable.sol";
  * stake/unstake the corresponding LP token
  * currently supported pools: cake-bnb, cake-usdt, cake-busd, busd-bnb
  */
-contract PancakeOpportunityV2 is OpportunityV2, ReentrancyGuardUpgradeable {
+contract PancakeOpportunityV2 is OpportunityV2 {
     using UniERC20Upgradeable for IERC20Upgradeable;
 
     address public swapContract;

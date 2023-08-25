@@ -1,21 +1,34 @@
-import { ethers, waffle } from "hardhat";
+import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { expect } from "chai";
-import { stakingLpFixture } from "./stakingLp.fixture";
+import { ethers, waffle } from "hardhat";
 import { UniswapV2PairTest } from "../artifacts/types";
+import { stakingLpFixture } from "./stakingLp.fixture";
 import { BigNumber } from "ethers";
 import { anyValue } from "@nomicfoundation/hardhat-chai-matchers/withArgs";
-import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 
 describe("StakingLP", async () => {
   let loadFixture: ReturnType<typeof waffle.createFixtureLoader>;
-  let owner, revenue, userAccount, userAccount2, userAccount3;
+  let owner,
+    revenue,
+    userAccount,
+    userAccount2,
+    userAccount3,
+    liquidityProvider1,
+    liquidityProvider2;
   let network;
 
   before(async () => {
-    [owner, revenue, userAccount, userAccount2, userAccount3] =
-      await ethers.getSigners();
+    [
+      owner,
+      revenue,
+      userAccount,
+      userAccount2,
+      userAccount3,
+      liquidityProvider1,
+      liquidityProvider2,
+    ] = await ethers.getSigners();
     loadFixture = waffle.createFixtureLoader(
-      [owner, revenue],
+      [owner, revenue, liquidityProvider1, liquidityProvider2],
       <any>ethers.provider
     );
     network = await ethers.provider.getNetwork();
@@ -63,8 +76,11 @@ describe("StakingLP", async () => {
     });
 
     it("should fail before the start of the opportunity", async () => {
-      const { stakingLP2, crowdUsdtPair, crowdUsdtLpStakeOpportunity } =
-        await loadFixture(stakingLpFixture);
+      const {
+        stakingLP2,
+        crowdUsdtPair,
+        crowdUsdtLpStakeOpportunity,
+      } = await loadFixture(stakingLpFixture);
       await stakingLP2.setOpportunityContract(
         crowdUsdtLpStakeOpportunity.address
       );
@@ -101,8 +117,11 @@ describe("StakingLP", async () => {
     });
 
     it("User should be able to stake if they are eligible", async () => {
-      const { stakingLP2, crowdUsdtPair, crowdUsdtLpStakeOpportunity } =
-        await loadFixture(stakingLpFixture);
+      const {
+        stakingLP2,
+        crowdUsdtPair,
+        crowdUsdtLpStakeOpportunity,
+      } = await loadFixture(stakingLpFixture);
       await stakingLP2.setOpportunityContract(
         crowdUsdtLpStakeOpportunity.address
       );
@@ -131,8 +150,11 @@ describe("StakingLP", async () => {
     });
 
     it("User should be able to stake", async () => {
-      const { stakingLP, crowdUsdtPair, crowdUsdtLpStakeOpportunity } =
-        await loadFixture(stakingLpFixture);
+      const {
+        stakingLP,
+        crowdUsdtPair,
+        crowdUsdtLpStakeOpportunity,
+      } = await loadFixture(stakingLpFixture);
 
       const amountLP = ethers.utils.parseEther("1");
       const opportunity = await mintAndApprove(
@@ -174,8 +196,12 @@ describe("StakingLP", async () => {
     });
 
     it("should fail when trying to withdraw more rewards", async () => {
-      const { stakingLP, crowdUsdtPair, crowdUsdtLpStakeOpportunity, CROWD } =
-        await loadFixture(stakingLpFixture);
+      const {
+        stakingLP,
+        crowdUsdtPair,
+        crowdUsdtLpStakeOpportunity,
+        CROWD,
+      } = await loadFixture(stakingLpFixture);
 
       const rewards = ethers.utils.parseEther("80000000");
       await notify(CROWD, rewards, stakingLP);
@@ -206,8 +232,12 @@ describe("StakingLP", async () => {
     });
 
     it("User should be able to withdraw rewards", async () => {
-      const { stakingLP, crowdUsdtPair, crowdUsdtLpStakeOpportunity, CROWD } =
-        await loadFixture(stakingLpFixture);
+      const {
+        stakingLP,
+        crowdUsdtPair,
+        crowdUsdtLpStakeOpportunity,
+        CROWD,
+      } = await loadFixture(stakingLpFixture);
 
       const rewards = ethers.utils.parseEther("80000000");
       await notify(CROWD, rewards, stakingLP);
@@ -314,8 +344,11 @@ describe("StakingLP", async () => {
     });
 
     it("should fail when trying to withdraw more LP tokens", async () => {
-      const { stakingLP, crowdUsdtPair, crowdUsdtLpStakeOpportunity } =
-        await loadFixture(stakingLpFixture);
+      const {
+        stakingLP,
+        crowdUsdtPair,
+        crowdUsdtLpStakeOpportunity,
+      } = await loadFixture(stakingLpFixture);
 
       const amountLP = ethers.utils.parseEther("1");
       const opportunity = await mintAndApprove(
@@ -341,8 +374,11 @@ describe("StakingLP", async () => {
     });
 
     it("should fail when trying to withdraw for an account other than resonateAdapter", async () => {
-      const { stakingLP, crowdUsdtPair, crowdUsdtLpStakeOpportunity } =
-        await loadFixture(stakingLpFixture);
+      const {
+        stakingLP,
+        crowdUsdtPair,
+        crowdUsdtLpStakeOpportunity,
+      } = await loadFixture(stakingLpFixture);
 
       const amountLP = ethers.utils.parseEther("1");
       const opportunity = await mintAndApprove(
@@ -372,8 +408,12 @@ describe("StakingLP", async () => {
     });
 
     it("User should be able to withdraw some LP tokens", async () => {
-      const { stakingLP, crowdUsdtPair, crowdUsdtLpStakeOpportunity, CROWD } =
-        await loadFixture(stakingLpFixture);
+      const {
+        stakingLP,
+        crowdUsdtPair,
+        crowdUsdtLpStakeOpportunity,
+        CROWD,
+      } = await loadFixture(stakingLpFixture);
 
       const rewards = ethers.utils.parseEther("80000000");
       await notify(CROWD, rewards, stakingLP);
@@ -419,8 +459,12 @@ describe("StakingLP", async () => {
     });
 
     it("User should be able to withdraw all LP tokens and receive all rewards", async () => {
-      const { stakingLP, crowdUsdtPair, crowdUsdtLpStakeOpportunity, CROWD } =
-        await loadFixture(stakingLpFixture);
+      const {
+        stakingLP,
+        crowdUsdtPair,
+        crowdUsdtLpStakeOpportunity,
+        CROWD,
+      } = await loadFixture(stakingLpFixture);
 
       const rewards = ethers.utils.parseEther("80000000");
       await notify(CROWD, rewards, stakingLP);
@@ -479,8 +523,12 @@ describe("StakingLP", async () => {
     });
 
     it("Owner should be able to withdraw some LP tokens", async () => {
-      const { stakingLP, crowdUsdtPair, crowdUsdtLpStakeOpportunity, CROWD } =
-        await loadFixture(stakingLpFixture);
+      const {
+        stakingLP,
+        crowdUsdtPair,
+        crowdUsdtLpStakeOpportunity,
+        CROWD,
+      } = await loadFixture(stakingLpFixture);
 
       const rewards = ethers.utils.parseEther("80000000");
       await notify(CROWD, rewards, stakingLP);
@@ -523,8 +571,12 @@ describe("StakingLP", async () => {
     });
 
     it("Owner should be able to withdraw all LP tokens and receive all rewards", async () => {
-      const { stakingLP, crowdUsdtPair, crowdUsdtLpStakeOpportunity, CROWD } =
-        await loadFixture(stakingLpFixture);
+      const {
+        stakingLP,
+        crowdUsdtPair,
+        crowdUsdtLpStakeOpportunity,
+        CROWD,
+      } = await loadFixture(stakingLpFixture);
 
       const rewards = ethers.utils.parseEther("80000000");
       await notify(CROWD, rewards, stakingLP);
@@ -570,8 +622,12 @@ describe("StakingLP", async () => {
 
   describe("notifyRewardAmount", async () => {
     it("rewards are changed during the opportunity", async () => {
-      const { stakingLP, crowdUsdtPair, CROWD, crowdUsdtLpStakeOpportunity } =
-        await loadFixture(stakingLpFixture);
+      const {
+        stakingLP,
+        crowdUsdtPair,
+        CROWD,
+        crowdUsdtLpStakeOpportunity,
+      } = await loadFixture(stakingLpFixture);
 
       const rewards = ethers.utils.parseEther("80000000");
       await notify(CROWD, rewards, stakingLP);
@@ -616,8 +672,12 @@ describe("StakingLP", async () => {
     });
 
     it("rewards are changed before the start of the opportunity", async () => {
-      const { stakingLP2, crowdUsdtPair, CROWD, crowdUsdtLpStakeOpportunity } =
-        await loadFixture(stakingLpFixture);
+      const {
+        stakingLP2,
+        crowdUsdtPair,
+        CROWD,
+        crowdUsdtLpStakeOpportunity,
+      } = await loadFixture(stakingLpFixture);
       await stakingLP2.setOpportunityContract(
         crowdUsdtLpStakeOpportunity.address
       );
@@ -672,8 +732,12 @@ describe("StakingLP", async () => {
     });
 
     it("reward situation when reward < rewardsDuration", async () => {
-      const { stakingLP2, crowdUsdtPair, CROWD, crowdUsdtLpStakeOpportunity } =
-        await loadFixture(stakingLpFixture);
+      const {
+        stakingLP2,
+        crowdUsdtPair,
+        CROWD,
+        crowdUsdtLpStakeOpportunity,
+      } = await loadFixture(stakingLpFixture);
       await stakingLP2.setOpportunityContract(
         crowdUsdtLpStakeOpportunity.address
       );
@@ -740,8 +804,12 @@ describe("StakingLP", async () => {
     });
 
     it("rewards are changed during the opportunity", async () => {
-      const { stakingLP, crowdUsdtPair, CROWD, crowdUsdtLpStakeOpportunity } =
-        await loadFixture(stakingLpFixture);
+      const {
+        stakingLP,
+        crowdUsdtPair,
+        CROWD,
+        crowdUsdtLpStakeOpportunity,
+      } = await loadFixture(stakingLpFixture);
 
       const rewards = ethers.utils.parseEther("80000000");
       await notify(CROWD, rewards, stakingLP);
@@ -799,8 +867,11 @@ describe("StakingLP", async () => {
     });
 
     it("rewards are changed before the start of the opportunity", async () => {
-      const { stakingLP2, CROWD, crowdUsdtLpStakeOpportunity } =
-        await loadFixture(stakingLpFixture);
+      const {
+        stakingLP2,
+        CROWD,
+        crowdUsdtLpStakeOpportunity,
+      } = await loadFixture(stakingLpFixture);
       await stakingLP2.setOpportunityContract(
         crowdUsdtLpStakeOpportunity.address
       );
@@ -832,8 +903,12 @@ describe("StakingLP", async () => {
     });
 
     it("duration is changed during the opportunity", async () => {
-      const { stakingLP, crowdUsdtPair, CROWD, crowdUsdtLpStakeOpportunity } =
-        await loadFixture(stakingLpFixture);
+      const {
+        stakingLP,
+        crowdUsdtPair,
+        CROWD,
+        crowdUsdtLpStakeOpportunity,
+      } = await loadFixture(stakingLpFixture);
 
       const rewards = ethers.utils.parseEther("80000000");
       await notify(CROWD, rewards, stakingLP);
@@ -898,8 +973,12 @@ describe("StakingLP", async () => {
     });
 
     it("duration is changed before the start of the opportunity", async () => {
-      const { stakingLP2, crowdUsdtPair, CROWD, crowdUsdtLpStakeOpportunity } =
-        await loadFixture(stakingLpFixture);
+      const {
+        stakingLP2,
+        crowdUsdtPair,
+        CROWD,
+        crowdUsdtLpStakeOpportunity,
+      } = await loadFixture(stakingLpFixture);
       await stakingLP2.setOpportunityContract(
         crowdUsdtLpStakeOpportunity.address
       );
@@ -957,8 +1036,12 @@ describe("StakingLP", async () => {
     });
 
     it("opportunity has started with couple of users", async () => {
-      const { stakingLP, crowdUsdtPair, CROWD, crowdUsdtLpStakeOpportunity } =
-        await loadFixture(stakingLpFixture);
+      const {
+        stakingLP,
+        crowdUsdtPair,
+        CROWD,
+        crowdUsdtLpStakeOpportunity,
+      } = await loadFixture(stakingLpFixture);
 
       const rewards = ethers.utils.parseEther("80000000");
       await notify(CROWD, rewards, stakingLP);
@@ -1090,8 +1173,12 @@ describe("StakingLP", async () => {
 
   describe("earned", () => {
     it("The eligible user stakes and their rewards should be calculated after startTime", async () => {
-      const { stakingLP2, crowdUsdtPair, CROWD, crowdUsdtLpStakeOpportunity } =
-        await loadFixture(stakingLpFixture);
+      const {
+        stakingLP2,
+        crowdUsdtPair,
+        CROWD,
+        crowdUsdtLpStakeOpportunity,
+      } = await loadFixture(stakingLpFixture);
       await stakingLP2.setOpportunityContract(
         crowdUsdtLpStakeOpportunity.address
       );
@@ -1137,8 +1224,12 @@ describe("StakingLP", async () => {
     });
 
     it("The rewards calculation should stop when the opportunity ends", async () => {
-      const { stakingLP, crowdUsdtPair, crowdUsdtLpStakeOpportunity, CROWD } =
-        await loadFixture(stakingLpFixture);
+      const {
+        stakingLP,
+        crowdUsdtPair,
+        crowdUsdtLpStakeOpportunity,
+        CROWD,
+      } = await loadFixture(stakingLpFixture);
 
       const rewards = ethers.utils.parseEther("80000000");
       await notify(CROWD, rewards, stakingLP);
@@ -1187,8 +1278,12 @@ describe("StakingLP", async () => {
     });
 
     it("Multiple users", async () => {
-      const { stakingLP, crowdUsdtPair, CROWD, crowdUsdtLpStakeOpportunity } =
-        await loadFixture(stakingLpFixture);
+      const {
+        stakingLP,
+        crowdUsdtPair,
+        CROWD,
+        crowdUsdtLpStakeOpportunity,
+      } = await loadFixture(stakingLpFixture);
 
       const rewards = ethers.utils.parseEther("80000000");
       await notify(CROWD, rewards, stakingLP);
@@ -1278,8 +1373,12 @@ describe("StakingLP", async () => {
     });
 
     it("combination of change duration and start time", async () => {
-      const { stakingLP2, crowdUsdtPair, CROWD, crowdUsdtLpStakeOpportunity } =
-        await loadFixture(stakingLpFixture);
+      const {
+        stakingLP2,
+        crowdUsdtPair,
+        CROWD,
+        crowdUsdtLpStakeOpportunity,
+      } = await loadFixture(stakingLpFixture);
       await stakingLP2.setOpportunityContract(
         crowdUsdtLpStakeOpportunity.address
       );

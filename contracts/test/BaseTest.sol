@@ -23,15 +23,12 @@ contract BaseTest is Context {
         return receivedETH;
     }
 
-    function _safeTransfer(
-        address token,
-        address to,
-        uint256 value
-    ) internal {
+    function _safeTransfer(address token, address to, uint256 value) internal {
         receivedETH = msg.value;
 
         if (IERC20(token).isETH()) {
-            payable(to).transfer(value);
+            (bool success, ) = to.call{value: value}(new bytes(0));
+            require(success, "ce11");
         } else {
             IERC20(token).transfer(to, value);
         }
@@ -46,7 +43,8 @@ contract BaseTest is Context {
         receivedETH = msg.value;
 
         if (IERC20(token).isETH()) {
-            payable(to).transfer(value);
+            (bool success, ) = to.call{value: value}(new bytes(0));
+            require(success, "ce11");
         } else {
             IERC20(token).transferFrom(from, to, value);
         }
