@@ -364,6 +364,54 @@ describe("LockableStakingRewards", () => {
         balanceAfterStaking.sub(expectedReward)
       );
     });
+
+    it("after withdraw couldn't staked by checking the archived flag", async function () {
+      const {
+        lockableStakingRewards: hardhatLockableStakingRewards,
+        CROWD: hardhatCrowdToken,
+      } = await loadFixture(lockableStakingRewardsFixture);
+      let apy: BigNumber = ethers.BigNumber.from(30); // 30%
+      let duration: BigNumber = ethers.BigNumber.from(30 * 24 * 60 * 60);
+      const stakingAmount = ethers.utils.parseUnits("10", "ether");
+      const expectedReward: BigNumber = stakingAmount
+          .mul(apy)
+          .mul(duration)
+          .div(365 * 24 * 60 * 60 * 100);
+      await hardhatCrowdToken.mint(hardhatLockableStakingRewards.address ?? hardhatLockableStakingRewards, stakingAmount.add(expectedReward));
+
+      await createPlan(hardhatLockableStakingRewards);
+
+      await mintAndApprove(
+          hardhatCrowdToken,
+          hardhatLockableStakingRewards,
+          stakingAmount,
+          account1);
+
+      await hardhatLockableStakingRewards
+          .connect(account1)
+          .stake(0, stakingAmount);
+
+      await moveTimeForward(2592000);
+      await hardhatLockableStakingRewards.setUnstakeFee(0);
+      await hardhatLockableStakingRewards
+          .connect(account1)
+          .withdraw(0, 0, true);
+
+      const userStakesBefore =
+          await hardhatLockableStakingRewards.userStakes(
+              account1.address,0
+          );
+      expect(userStakesBefore.archived).to.be.true;
+
+      await expect(
+          hardhatLockableStakingRewards
+              .connect(account1)
+              .withdraw(0, 0, true)
+      ).to.be.revertedWith(
+          "LockableStakingRewards: The stake has been archived"
+      );
+
+    });
   });
 
   describe("reStake", () => {
