@@ -9,6 +9,7 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 import "../helpers/OwnableUpgradeable.sol";
+import "../helpers/BlockBasedLockUpgradeable.sol";
 
 /**
  * @title LockableStakingRewards for the CrowdToken
@@ -18,6 +19,7 @@ contract LockableStakingRewards is
     Initializable,
     UUPSUpgradeable,
     OwnableUpgradeable,
+    BlockBasedLockUpgradeable,
     PausableUpgradeable,
     ReentrancyGuardUpgradeable
 {
@@ -68,7 +70,7 @@ contract LockableStakingRewards is
     /**
      * @dev a struct containing the investmanet details of each plan
      * @member totalInvestAmount , is the total amount of staked in each plan
-     * @member totalInvestCount ,  is the number of stakers in each plan
+     * @member totalInvestCount ,  is the number of stakes in each plan
      */
     struct InvestmentInfo {
         uint256 totalInvestAmount;
@@ -86,9 +88,16 @@ contract LockableStakingRewards is
         uint256 unstakeFee;
     }
 
+    //Determine how many blocks will be locked to complete critical operations
+    uint8 public constant LOCK_FOR_BLOCS_DURATION = 10;
+
+    uint256 public constant MAX_FEE = 1e20; //100%
+    uint16 public constant MAX_APR = 1e4; //100%
+
     IERC20Upgradeable public stakingToken;
 
     mapping(address => Stake[]) public userStakes; // user => stakes
+    mapping(address => mapping(uint256 => uint256)) public userStakeIdToIndex; // user => stakeId => stakeIndex (in array)
     // Mapping to track if an address has staked before
     mapping(address => bool) public hasStaked;
     // Array to store addresses that have staked
@@ -203,18 +212,34 @@ contract LockableStakingRewards is
         address _stakingToken,
         FeeInfo memory _feeInfo
     ) public initializer {
-        require(
-            _feeInfo.feeTo != address(0),
-            "LockableStakingRewards: feeTo address is not valid"
-        );
+        _requiredValidAddress(_stakingToken);
 
         OwnableUpgradeable.initialize();
+        BlockBasedLockUpgradeable.__BlockBasedLock_init();
         PausableUpgradeable.__Pausable_init();
         ReentrancyGuardUpgradeable.__ReentrancyGuard_init();
 
         stakingToken = IERC20Upgradeable(_stakingToken);
 
+        setFee(_feeInfo);
+    }
+
+    function setFee(FeeInfo memory _feeInfo) public onlyOwner whenNotLocked {
+        _requiredValidAddress(_feeInfo.feeTo);
+        _requiredValidFee(_feeInfo.stakeFee);
+        _requiredValidFee(_feeInfo.unstakeFee);
+
         feeInfo = _feeInfo;
+        emit SetFee(
+            msg.sender,
+            _feeInfo.feeTo,
+            _feeInfo.stakeFee,
+            _feeInfo.unstakeFee
+        );
+    }
+
+    function getVersion() external pure returns (string memory) {
+        return "v1.1.0";
     }
 
     function pause() external onlyOwner {
@@ -236,20 +261,11 @@ contract LockableStakingRewards is
         uint16 _apr,
         uint16 _defaultApr
     ) external onlyOwner {
-        require(_duration > 0, "LockableStakingRewards: Invalid duration.");
-        require(_apr >= 0, "LockableStakingRewards: Invalid apr.");
-        require(
-            _defaultApr >= 0,
-            "LockableStakingRewards: Invalid default apr."
-        );
+        _requiredValidApr(_apr);
+        _requiredValidApr(_defaultApr);
 
         // Using planCounter as the new planId
         uint256 _planId = planCounter++;
-
-        require(
-            !_planExists(_duration, _apr, _defaultApr),
-            "LockableStakingRewards: Similar plan already exists."
-        );
 
         plans[_planId] = Plan(
             _planId,
@@ -264,64 +280,50 @@ contract LockableStakingRewards is
     }
 
     /**
-     * @notice To update an existing plan
+     * @notice To activate/deactivate an existing plan
      * @param _planId The id of specific plan
-     * @param _newDuration, The duration of each staking plan (between startTime and endTime)
-     * @param _newApr The apr of the staking plan, with 2 decimals, (1=0.01% )
-     * @param _newDefaultApr The defaukt apr of each staking plan with 2 decimals, (1=0.01% ). After of duration, rewards will be calculate based on defaultApr
+     * @param _isActive The apr of the staking plan, with 2 decimals, (1=0.01% )
      */
-    function updatePlan(
+    function changePlanActiveStatus(
         uint256 _planId,
-        uint128 _newDuration,
-        uint16 _newApr,
-        uint16 _newDefaultApr,
-        bool _newActive
-    ) external onlyOwner validPlanId(_planId) {
+        bool _isActive
+    ) external onlyOwner whenNotLocked validPlanId(_planId) {
         require(
             plans[_planId].exists,
             "LockableStakingRewards: Plan does not exist."
         );
-        require(
-            _newDuration > 0,
-            "LockableStakingRewards: Invalid new duration."
-        );
-        require(_newApr > 0, "LockableStakingRewards: Invalid new apr.");
-        require(
-            _newDefaultApr >= 0,
-            "LockableStakingRewards: Invalid default new apr."
-        );
 
         // Update the plan attributes
-        plans[_planId] = Plan(
-            _planId,
-            _newDuration,
-            _newApr,
-            _newDefaultApr,
-            _newActive,
-            true
-        );
+        plans[_planId].active = _isActive;
 
         emit PlanUpdated(
             msg.sender,
             _planId,
-            _newDuration,
-            _newApr,
-            _newDefaultApr
+            plans[_planId].duration,
+            plans[_planId].apr,
+            plans[_planId].defaultApr
         );
     }
 
     /**
      * @param _planId The id of a specific plan
+     * @param _stakeFee The fee to stake. It is required to send for double checking
      * @param _amount The amount to stake
      */
     function stake(
         uint256 _planId,
+        uint256 _stakeFee,
         uint256 _amount
-    ) external nonReentrant whenNotPaused validPlanId(_planId) {
-        require(
-            _amount > 0,
-            "LockableStakingRewards: Staked amount must be greater than 0."
-        );
+    )
+        external
+        nonReentrant
+        whenNotPaused
+        validPlanId(_planId)
+        lockForBlocksDuration(LOCK_FOR_BLOCS_DURATION)
+    {
+        _requiredMatchingFees(_stakeFee, feeInfo.stakeFee);
+
+        Plan memory _plan = plans[_planId]; // Use storage reference
 
         _transferTokenFromTo(
             stakingToken,
@@ -331,10 +333,21 @@ contract LockableStakingRewards is
         );
 
         //Decrease fee
-        (_amount, ) = _deductFee(feeInfo.stakeFee, stakingToken, _amount);
+        uint256 _feePercentage = feeInfo.stakeFee;
+        uint256 _totalFee;
+        (_amount, _totalFee) = _deductFee(
+            _feePercentage,
+            stakingToken,
+            _amount
+        );
 
-        Plan memory _plan = plans[_planId]; // Use storage reference
+        require(
+            _feePercentage == 0 || _totalFee != 0,
+            "LockableStakingRewards: Fee is zero (amount is too low)"
+        );
+
         require(_plan.exists, "LockableStakingRewards: Plan does not exist.");
+
         require(_plan.active, "LockableStakingRewards: Plan does not active.");
 
         (uint256 _stakeId, uint256 _stakedAmount) = _createStake(
@@ -355,11 +368,13 @@ contract LockableStakingRewards is
 
     /**
      * @notice if the amount be equal to origin staked amount, or the _max is true, reward and origin staked amount will withdraw
+     * @param _unstakeFee The fee to unstake. It is required to send for double checking
      * @param _stakeId , an uniq id for each stake
      * @param _amount to withdraw
      * @param _max A boolean to withdraw the max amount
      */
     function withdraw(
+        uint256 _unstakeFee,
         uint256 _stakeId,
         uint256 _amount,
         bool _max
@@ -369,6 +384,7 @@ contract LockableStakingRewards is
         whenNotPaused
         validStakeId(_stakeId)
         validUser(msg.sender)
+        lockForBlocksDuration(LOCK_FOR_BLOCS_DURATION)
     {
         /**
          * When _max is true, the _amount is not important.
@@ -393,9 +409,34 @@ contract LockableStakingRewards is
             "LockableStakingRewards: Staking period has not ended yet"
         );
 
-        _amount = _withdrawStake(_stakeToWithdraw, _amount, _max);
+        Plan memory _plan = plans[_stakeToWithdraw.planId]; // Use storage reference
+
+        _requiredMatchingFees(_unstakeFee, feeInfo.unstakeFee);
+
+        uint256 _maxWithdrawAmount;
+        (_amount, _maxWithdrawAmount) = _withdrawStake(
+            _stakeToWithdraw,
+            _plan,
+            _amount,
+            _max
+        );
+
         //Decrease fee
-        (_amount, ) = _deductFee(feeInfo.unstakeFee, stakingToken, _amount);
+        uint256 _totalFee;
+        uint256 _feePercentage = feeInfo.unstakeFee;
+        (_amount, _totalFee) = _deductFee(
+            _feePercentage,
+            stakingToken,
+            _amount
+        );
+
+        require(
+            _feePercentage == 0 ||
+                _totalFee != 0 ||
+                _amount == _maxWithdrawAmount,
+            "LockableStakingRewards: Fee is zero (amount is too low)"
+        );
+
         _transferTokenTo(stakingToken, payable(msg.sender), _amount);
 
         emit Withdrawn(
@@ -410,9 +451,13 @@ contract LockableStakingRewards is
 
     /**
      * @notice if the user wants to extend in specific plan
+     * @param _stakeFee The fee to stake. It is required to send for double checking
+     * @param _unstakeFee The fee to unstake. It is required to send for double checking
      * @param _stakeId The id of a specific stake
      */
     function extend(
+        uint256 _stakeFee,
+        uint256 _unstakeFee,
         uint256 _stakeId
     )
         external
@@ -420,6 +465,7 @@ contract LockableStakingRewards is
         whenNotPaused
         validStakeId(_stakeId)
         validUser(msg.sender)
+        lockForBlocksDuration(LOCK_FOR_BLOCS_DURATION)
     {
         Stake storage _stakeToRestake = _getUserStakeByStakeId(
             msg.sender,
@@ -439,19 +485,34 @@ contract LockableStakingRewards is
 
         require(_plan.active, "LockableStakingRewards: Plan does not active.");
 
+        _requiredMatchingFees(_stakeFee, feeInfo.stakeFee);
+        _requiredMatchingFees(_unstakeFee, feeInfo.unstakeFee);
+
         //Withdraw all value from the previous Stake
 
         /** When the max field is true, the value of the second field is not importnat,
          * since the max amount is calculated in the function
          */
-        uint256 _maxWithdrawAmount = _withdrawStake(_stakeToRestake, 0, true);
+        (, uint256 _maxWithdrawAmount) = _withdrawStake(
+            _stakeToRestake,
+            _plan,
+            0,
+            true
+        );
 
         //Decrease fee
         FeeInfo memory _feeInfo = feeInfo;
-        (_maxWithdrawAmount, ) = _deductFee(
-            _feeInfo.unstakeFee + _feeInfo.stakeFee,
+        uint256 _feePercentage = _feeInfo.unstakeFee + _feeInfo.stakeFee;
+        uint256 _totalFee;
+        (_maxWithdrawAmount, _totalFee) = _deductFee(
+            _feePercentage,
             stakingToken,
             _maxWithdrawAmount
+        );
+
+        require(
+            _feePercentage == 0 || _totalFee != 0,
+            "LockableStakingRewards: Fee is zero (amount is too low)"
         );
 
         //create new stake
@@ -472,20 +533,6 @@ contract LockableStakingRewards is
         );
     }
 
-    function setFee(FeeInfo memory _feeInfo) external onlyOwner {
-        require(
-            _feeInfo.feeTo != address(0),
-            "LockableStakingRewards: address is not valid"
-        );
-        feeInfo = _feeInfo;
-        emit SetFee(
-            msg.sender,
-            _feeInfo.feeTo,
-            _feeInfo.stakeFee,
-            _feeInfo.unstakeFee
-        );
-    }
-
     /**
      * @param _userAddress The address of the user
      * @return all staking records of the user
@@ -496,7 +543,11 @@ contract LockableStakingRewards is
         Stake[] memory _stakeList = userStakes[_userAddress];
 
         for (uint256 i = 0; i < _stakeList.length; ++i) {
-            _stakeList[i].reward += _calculateRewardIncrement(_stakeList[i]);
+            Plan memory _plan = plans[_stakeList[i].planId];
+            _stakeList[i].reward += _calculateRewardIncrement(
+                _stakeList[i],
+                _plan
+            );
         }
 
         return _stakeList;
@@ -549,31 +600,41 @@ contract LockableStakingRewards is
         uint256 _stakeId
     ) external view returns (uint256) {
         Stake memory _stake = _getUserStakeByStakeId(_userAddress, _stakeId);
-        uint256 _rewardIncrement = _calculateRewardIncrement(_stake);
+        Plan memory _plan = plans[_stake.planId];
+        uint256 _rewardIncrement = _calculateRewardIncrement(_stake, _plan);
         return _rewardIncrement + _stake.reward;
     }
 
     function _authorizeUpgrade(address) internal override onlyOwner {}
 
-    function _planExists(
-        uint256 _duration,
-        uint256 _apr,
-        uint256 _defaultApr
-    ) internal view returns (bool) {
-        for (uint256 i = 0; i < planCounter; ++i) {
-            Plan storage currentPlan = plans[i];
+    function _requiredMatchingFees(
+        uint256 _providedFee,
+        uint256 _contractFee
+    ) internal pure {
+        require(
+            _providedFee == _contractFee,
+            "LockableStakingRewards: stake/unstake fee is not expected"
+        );
+    }
 
-            if (
-                currentPlan.exists &&
-                currentPlan.duration == _duration &&
-                currentPlan.apr == _apr &&
-                currentPlan.defaultApr == _defaultApr
-            ) {
-                return true; // A plan with these attributes already exists
-            }
-        }
+    function _requiredValidFee(uint256 _fee) internal pure {
+        // 1e18 is 1%
+        require(_fee < MAX_FEE, "LockableStakingRewards: Invalid fee");
+    }
 
-        return false; // No matching plan found
+    function _requiredValidApr(uint16 _apr) internal pure {
+        //1e2 is 1%
+        require(
+            _apr < MAX_APR,
+            "LockableStakingRewards: Invalid apr/default apr"
+        );
+    }
+
+    function _requiredValidAddress(address _address) internal pure {
+        require(
+            _address != address(0),
+            "LockableStakingRewards: address is not valid"
+        );
     }
 
     /**
@@ -608,6 +669,7 @@ contract LockableStakingRewards is
             archived: false
         });
         userStakes[user].push(_newStake);
+        userStakeIdToIndex[user][_stakeId] = userStakes[user].length - 1;
 
         planInvestmentInfo[_plan.id].totalInvestAmount += _stakedAmount;
         ++planInvestmentInfo[_plan.id].totalInvestCount;
@@ -617,30 +679,33 @@ contract LockableStakingRewards is
      * @dev a helper function to withdraws a stake
      * @notice if the amount be equal to origin staked amount, or the _max is true, reward and origin staked amount will withdraw
      * @param _stake object to withdraw
+     * @param _plan the plan assoictaed to the stake
      * @param _amount to withdraw
      * @param _max A boolean to withdraw the max amount
      */
     function _withdrawStake(
         Stake storage _stake,
+        Plan memory _plan,
         uint256 _amount,
         bool _max
-    ) internal returns (uint256 _withdrawnAmount) {
-        uint256 _rewardIncrement = _calculateRewardIncrement(_stake);
+    ) internal returns (uint256 _withdrawnAmount, uint256 _maxWithdrawAmount) {
+        uint256 _rewardIncrement = _calculateRewardIncrement(_stake, _plan);
 
-        uint256 _maxAmount = _stake.amount +
+        _maxWithdrawAmount =
+            _stake.amount +
             _stake.reward +
             _rewardIncrement -
             _stake.paidAmount;
 
         if (_max) {
-            _amount = _maxAmount;
+            _amount = _maxWithdrawAmount;
         }
         require(
-            _amount <= _maxAmount,
+            _amount <= _maxWithdrawAmount,
             "LockableStakingRewards: Amount is greater that stakedAmount + rewards"
         );
 
-        if (_amount == _maxAmount) {
+        if (_amount == _maxWithdrawAmount) {
             _stake.archived = true;
             --planInvestmentInfo[_stake.planId].totalInvestCount;
         }
@@ -669,11 +734,9 @@ contract LockableStakingRewards is
      * @param _stake The specific stake
      */
     function _calculateRewardIncrement(
-        Stake memory _stake
+        Stake memory _stake,
+        Plan memory _plan
     ) internal view returns (uint256) {
-        Plan memory _plan = plans[_stake.planId];
-        require(_plan.exists, "LockableStakingRewards: Plan does not exist.");
-
         uint256 _userReward = 0;
 
         //startTime is ths initial value of lastWithdrawalTime
@@ -703,29 +766,15 @@ contract LockableStakingRewards is
         uint256 _apr,
         uint256 _duration
     ) internal pure returns (uint256 _reward) {
-        _reward = (_amount * _apr * _duration) / (365 days * 1e4);
+        _reward = ((_amount * _apr * _duration) * 1e16) / (360 days * 1e20);
     }
 
     function _getUserStakeByStakeId(
         address _userAddress,
         uint256 _stakeId
     ) internal view returns (Stake storage) {
-        Stake[] storage _userStakeArray = userStakes[_userAddress];
-        uint256 _stakeIndex = _findStakeIndex(_userStakeArray, _stakeId);
-        return _userStakeArray[_stakeIndex];
-    }
-
-    function _findStakeIndex(
-        Stake[] memory _stakeList,
-        uint256 _stakeId
-    ) internal pure returns (uint256) {
-        for (uint256 i = 0; i < _stakeList.length; ++i) {
-            if (_stakeList[i].id == _stakeId) {
-                return i;
-            }
-        }
-
-        revert("LockableStakingRewards: stakeId is not exists!");
+        uint256 _stakeIndex = userStakeIdToIndex[_userAddress][_stakeId];
+        return userStakes[_userAddress][_stakeIndex];
     }
 
     function _deductFee(
