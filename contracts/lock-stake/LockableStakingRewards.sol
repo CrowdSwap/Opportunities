@@ -325,8 +325,6 @@ contract LockableStakingRewards is
 
         Plan memory _plan = plans[_planId]; // Use storage reference
 
-        // _requiredMatchingPlanDuration(_planDuration, _plan.duration);
-
         _transferTokenFromTo(
             stakingToken,
             msg.sender,
@@ -413,9 +411,6 @@ contract LockableStakingRewards is
 
         Plan memory _plan = plans[_stakeToWithdraw.planId]; // Use storage reference
 
-        // _requiredMatchingPlanApr(_planApr, _plan.apr);
-        // _requiredMatchingPlanDefaultApr(_planDefaultApr, _plan.defaultApr);
-
         _requiredMatchingFees(_unstakeFee, feeInfo.unstakeFee);
 
         uint256 _maxWithdrawAmount;
@@ -489,10 +484,6 @@ contract LockableStakingRewards is
         );
 
         require(_plan.active, "LockableStakingRewards: Plan does not active.");
-
-        // _requiredMatchingPlanApr(_planApr, _plan.apr);
-        // _requiredMatchingPlanDefaultApr(_planDefaultApr, _plan.defaultApr);
-        // _requiredMatchingPlanDuration(_planDuration, _plan.duration);
 
         _requiredMatchingFees(_stakeFee, feeInfo.stakeFee);
         _requiredMatchingFees(_unstakeFee, feeInfo.unstakeFee);
@@ -646,36 +637,6 @@ contract LockableStakingRewards is
         );
     }
 
-    // function _requiredMatchingPlanDuration(
-    //     uint128 _providedPalnDuration,
-    //     uint128 _contractPalnDuration
-    // ) internal pure {
-    //     require(
-    //         _providedPalnDuration == _contractPalnDuration,
-    //         "LockableStakingRewards: Invalid plan duration"
-    //     );
-    // }
-
-    // function _requiredMatchingPlanApr(
-    //     uint16 _providedPlanApr,
-    //     uint16 _contractPlanApr
-    // ) internal pure {
-    //     require(
-    //         _providedPlanApr == _contractPlanApr,
-    //         "LockableStakingRewards: Invalid plan apr"
-    //     );
-    // }
-
-    // function _requiredMatchingPlanDefaultApr(
-    //     uint16 _providedPlanDefaultApr,
-    //     uint16 _contractPlanDefaultApr
-    // ) internal pure {
-    //     require(
-    //         _providedPlanDefaultApr == _contractPlanDefaultApr,
-    //         "LockableStakingRewards: Invalid plan default apr"
-    //     );
-    // }
-
     /**
      * @dev a helper function for stake
      * @param _plan The plan which is used for staking
@@ -708,7 +669,7 @@ contract LockableStakingRewards is
             archived: false
         });
         userStakes[user].push(_newStake);
-        userStakeIdToIndex[user][_stakeId] = userStakes[user].length-1;
+        userStakeIdToIndex[user][_stakeId] = userStakes[user].length - 1;
 
         planInvestmentInfo[_plan.id].totalInvestAmount += _stakedAmount;
         ++planInvestmentInfo[_plan.id].totalInvestCount;
