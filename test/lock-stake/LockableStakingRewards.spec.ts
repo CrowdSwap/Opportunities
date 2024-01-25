@@ -33,7 +33,6 @@ describe("LockableStakingRewards", () => {
       const plan = await hardhatLockableStakingRewards.plans(planId);
       expect(plan.exists).to.be.true;
     });
-
   });
 
   describe("stake", () => {
@@ -52,10 +51,9 @@ describe("LockableStakingRewards", () => {
           stakingAmount,
           account1);
       // Stake tokens
-      const fee=await hardhatLockableStakingRewards.feeInfo();
       await hardhatLockableStakingRewards
         .connect(account1)
-        .stake(planId, fee.stakeFee, stakingAmount);
+        .stake(planId, stakingAmount);
 
       // Check the stake
       const stake = await hardhatLockableStakingRewards.userStakes(
@@ -75,17 +73,13 @@ describe("LockableStakingRewards", () => {
       const planId = await createPlan(hardhatLockableStakingRewards);
 
       await mintAndApprove(
-        hardhatCrowdToken,
-        hardhatLockableStakingRewards,
-        stakingAmount,
-        account1
-      );
+          hardhatCrowdToken,
+          hardhatLockableStakingRewards,
+          stakingAmount,
+          account1);
 
-      const fee = await hardhatLockableStakingRewards.feeInfo();
       await expect(
-        hardhatLockableStakingRewards
-          .connect(account1)
-          .stake(planId, fee.stakeFee, stakingAmount)
+        hardhatLockableStakingRewards.connect(account1).stake(planId, stakingAmount)
       ).to.emit(hardhatLockableStakingRewards, "Staked");
     });
 
@@ -98,20 +92,19 @@ describe("LockableStakingRewards", () => {
 
       const planId = await createPlan(hardhatLockableStakingRewards);
       await hardhatLockableStakingRewards
-        .connect(owner)
-        .changePlanActiveStatus(planId, false);
+          .connect(owner)
+          .changePlanActiveStatus(planId,false);
 
       await mintAndApprove(
           hardhatCrowdToken,
           hardhatLockableStakingRewards,
           stakingAmount,
           account1);
-      
-    const fee = await hardhatLockableStakingRewards.feeInfo();
-    await expect(
-        hardhatLockableStakingRewards
-          .connect(account1)
-          .stake(planId, fee.stakeFee, stakingAmount)
+
+      await expect(
+          hardhatLockableStakingRewards
+              .connect(account1)
+              .stake(planId, stakingAmount)
       ).to.be.revertedWith("LockableStakingRewards: Plan does not active.");
 
     });
@@ -129,14 +122,12 @@ describe("LockableStakingRewards", () => {
           hardhatCrowdToken,
           hardhatLockableStakingRewards,
           stakingAmount,
-          account1
-      );
+          account1);
 
-      const fee = await hardhatLockableStakingRewards.feeInfo();
       await expect(
-        hardhatLockableStakingRewards
-          .connect(account1)
-          .stake(999, fee.stakeFee, stakingAmount)
+          hardhatLockableStakingRewards
+              .connect(account1)
+              .stake(999, stakingAmount)
       ).to.be.revertedWith("LockableStakingRewards: Invalid plan ID");
     });
 
@@ -155,10 +146,9 @@ describe("LockableStakingRewards", () => {
           stakingAmount,
           account1);
 
-      const fee = await hardhatLockableStakingRewards.feeInfo();
       await hardhatLockableStakingRewards
         .connect(account1)
-        .stake(planId, fee.stakeFee, stakingAmount);
+        .stake(planId, stakingAmount);
 
       // Verify that the user's stake has been recorded
       const userStakes =
@@ -190,15 +180,14 @@ describe("LockableStakingRewards", () => {
           amountToStake,
           account2);
 
-      const fee=await hardhatLockableStakingRewards.feeInfo();
       // Create a staking plan
       await hardhatLockableStakingRewards
         .connect(account1)
-        .stake(planId, fee.stakeFee, amountToStake);
+        .stake(planId, amountToStake);
 
       await hardhatLockableStakingRewards
         .connect(account2)
-        .stake(planId, fee.stakeFee ,amountToStake);
+        .stake(planId, amountToStake);
 
       const user1Stakes =
         await hardhatLockableStakingRewards.userStakes(
@@ -230,11 +219,10 @@ describe("LockableStakingRewards", () => {
           hardhatLockableStakingRewards,
           stakingAmount,
           account1);
-      
-      const fee=await hardhatLockableStakingRewards.feeInfo();
+
       await hardhatLockableStakingRewards
         .connect(account1)
-        .stake(planId, fee.stakeFee, stakingAmount);
+        .stake(planId, stakingAmount);
 
       // Retrieve the stakes for the user
       const userStakes =
@@ -269,12 +257,10 @@ describe("LockableStakingRewards", () => {
           hardhatLockableStakingRewards,
           stakingAmount,
           account1);
-      
-      const fee=await hardhatLockableStakingRewards.feeInfo();
 
       await hardhatLockableStakingRewards
         .connect(account1)
-        .stake(planId, fee.stakeFee, stakingAmount);
+        .stake(planId, stakingAmount);
 
       // Now you can check if user1's address is in the addresses array.
       // You would need a way in your contract or in your tests to fetch the addresses array or a function to check if an address exists in it.
@@ -311,12 +297,10 @@ describe("LockableStakingRewards", () => {
         hardhatLockableStakingRewards.address
       );
       expect(balanceStakingContract).to.equal(initial);
-      
-      const fee=await hardhatLockableStakingRewards.feeInfo();
 
       const stakeTx = await hardhatLockableStakingRewards
         .connect(account1)
-        .stake(planId, fee.stakeFee, stakingAmount);
+        .stake(planId, stakingAmount);
       const stakeReceipt= await stakeTx.wait();
       const stakeLog= getLog(stakeReceipt, "Staked");
       const stakeId= stakeLog.stakeId;
@@ -330,7 +314,7 @@ describe("LockableStakingRewards", () => {
 
       await hardhatLockableStakingRewards
         .connect(account1)
-        .withdraw(fee.unstakeFee, stakeId, 0, true);
+        .withdraw(stakeId, 0, true);
 
         const expectedReward: BigNumber = stakingAmount
         .mul(apr)
@@ -376,11 +360,9 @@ describe("LockableStakingRewards", () => {
       );
       expect(balanceStakingContract).to.equal(initial);
 
-      const fee=await hardhatLockableStakingRewards.feeInfo();
-
       const stakeTx = await hardhatLockableStakingRewards
           .connect(account1)
-          .stake(planId, fee.stakeFee, stakingAmount);
+          .stake(planId, stakingAmount);
       const stakeReceipt= await stakeTx.wait();
       const stakeLog= getLog(stakeReceipt, "Staked");
       const stakeId= stakeLog.stakeId;
@@ -394,7 +376,7 @@ describe("LockableStakingRewards", () => {
 
       await hardhatLockableStakingRewards
           .connect(account1)
-          .withdraw(fee.unstakeFee, stakeId, 0, true);
+          .withdraw(stakeId, 0, true);
 
       const expectedReward: BigNumber = stakingAmount
           .mul(apr)
@@ -407,11 +389,11 @@ describe("LockableStakingRewards", () => {
       expect(balanceAfterWithdraw).to.equal(
           balanceAfterStaking.sub(stakingAmount.add(expectedReward))
       );
-      
+
       await expect(
           hardhatLockableStakingRewards
               .connect(account1)
-              .withdraw(fee.unstakeFee, stakeId, 0, true)).to.be.revertedWith(
+              .withdraw(stakeId, 0, true)).to.be.revertedWith(
           "LockableStakingRewards: The stake has been archived"
       );
 
@@ -428,25 +410,18 @@ describe("LockableStakingRewards", () => {
       } = await loadFixture(lockableStakingRewardsFixture);
 
       const planId = await createPlan(hardhatLockableStakingRewards);
-      let fee=await hardhatLockableStakingRewards.feeInfo();
-      await hardhatLockableStakingRewards.setFee({
-        feeTo: fee.feeTo,
-        stakeFee: fee.stakeFee,
-        unstakeFee: BigNumber.from(0),
-      });
-
-      fee=await hardhatLockableStakingRewards.feeInfo();
-
+      const fee=await hardhatLockableStakingRewards.feeInfo();
+      await setFee(hardhatLockableStakingRewards,fee.feeTo,fee.stakeFee,BigNumber.from(0));
       await mintAndApprove(
           hardhatCrowdToken,
           hardhatLockableStakingRewards,
           stakingAmount,
           account1);
       await hardhatCrowdToken.mint(hardhatLockableStakingRewards.address, initial);
-      
+
       const stakeTx = await hardhatLockableStakingRewards
           .connect(account1)
-          .stake(planId, fee.stakeFee ,stakingAmount);
+          .stake(planId, stakingAmount);
       const stakeReceipt= await stakeTx.wait();
       const stakeLog= getLog(stakeReceipt, "Staked");
       const stakeId= stakeLog.stakeId;
@@ -460,7 +435,7 @@ describe("LockableStakingRewards", () => {
           .div(360 * 24 * 60 * 60 * 10000);
 
       // Call reStake function
-      await hardhatLockableStakingRewards.connect(account1).extend(fee.stakeFee,fee.unstakeFee,stakeId);
+      await hardhatLockableStakingRewards.connect(account1).extend(stakeId);
 
       // Assertions
       const userStakesBefore =
@@ -481,10 +456,9 @@ describe("LockableStakingRewards", () => {
       await expect(
           hardhatLockableStakingRewards
               .connect(account1)
-              .withdraw(fee.unstakeFee, stakeId, 0, true)).to.be.revertedWith(
+              .withdraw(stakeId, 0, true)).to.be.revertedWith(
           "LockableStakingRewards: The stake has been archived"
-      );
-
+      );      
     });
 
     it("shouldn't be able to withdraw more than the user can", async function () {
@@ -506,11 +480,9 @@ describe("LockableStakingRewards", () => {
           account1);
       await hardhatCrowdToken.mint(hardhatLockableStakingRewards.address, initial);
 
-      const fee = await hardhatLockableStakingRewards.feeInfo();
-
-      await hardhatLockableStakingRewards
-        .connect(account1)
-        .stake(planId, fee.stakeFee, stakingAmount);
+     await hardhatLockableStakingRewards
+          .connect(account1)
+          .stake(planId, stakingAmount);
 
       await moveTimeForward(30 * 24 * 60 * 60);
 
@@ -521,16 +493,10 @@ describe("LockableStakingRewards", () => {
           .div(360 * 24 * 60 * 60 * 10000);
 
       await expect(
-        hardhatLockableStakingRewards
-          .connect(account1)
-          .withdraw(
-            fee.unstakeFee,
-            0,
-            stakingAmount.add(expectedReward).add(2),
-            false
-          )
-      ).to.be.revertedWith(
-        "LockableStakingRewards: Amount is greater that stakedAmount + rewards"
+          hardhatLockableStakingRewards
+              .connect(account1)
+              .withdraw(0, stakingAmount.add(expectedReward).add(2), false)).to.be.revertedWith(
+          "LockableStakingRewards: Amount is greater that stakedAmount + rewards"
       );
 
     });
@@ -553,11 +519,10 @@ describe("LockableStakingRewards", () => {
           stakingAmount,
           account1);
       await hardhatCrowdToken.mint(hardhatLockableStakingRewards.address, initial);
-      
-      const fee = await hardhatLockableStakingRewards.feeInfo();
+
       await hardhatLockableStakingRewards
-        .connect(account1)
-        .stake(planId, fee.stakeFee, stakingAmount);
+          .connect(account1)
+          .stake(planId, stakingAmount);
 
       await moveTimeForward(30 * 24 * 60 * 60);
 
@@ -568,8 +533,8 @@ describe("LockableStakingRewards", () => {
           .div(360 * 24 * 60 * 60 * 10000);
 
       await hardhatLockableStakingRewards
-        .connect(account1)
-        .withdraw(fee.unstakeFee, 0, stakingAmount, false);
+          .connect(account1)
+          .withdraw(0, stakingAmount, false);
 
       const user1Stakes =
           await hardhatLockableStakingRewards.userStakes(
@@ -583,11 +548,10 @@ describe("LockableStakingRewards", () => {
       expect(user1Stakes.amount).to.equal(ethers.utils.parseUnits("10", "ether"));
 
       await expect(
-        hardhatLockableStakingRewards
-          .connect(account1)
-          .withdraw(fee.unstakeFee, 0, expectedReward.add(2), false)
-      ).to.be.revertedWith(
-        "LockableStakingRewards: Amount is greater that stakedAmount + rewards"
+          hardhatLockableStakingRewards
+              .connect(account1)
+              .withdraw(0, expectedReward.add(2), false)).to.be.revertedWith(
+          "LockableStakingRewards: Amount is greater that stakedAmount + rewards"
       );
 
     });
@@ -606,10 +570,10 @@ describe("LockableStakingRewards", () => {
           stakingAmount,
           account1);
 
-      const fee = await hardhatLockableStakingRewards.feeInfo();
+
       const stakeTx = await hardhatLockableStakingRewards
           .connect(account1)
-          .stake(planId, fee.stakeFee, stakingAmount);
+          .stake(planId, stakingAmount);
       const stakeReceipt= await stakeTx.wait();
       const stakeLog= getLog(stakeReceipt, "Staked");
       const stakeId= stakeLog.stakeId;
@@ -618,11 +582,10 @@ describe("LockableStakingRewards", () => {
       await moveTimeForward(20 * 24 * 60 * 60);
 
       await expect(
-        hardhatLockableStakingRewards
-          .connect(account1)
-          .withdraw(fee.unstakeFee, stakeId, 0, true)
-      ).to.be.revertedWith(
-        "LockableStakingRewards: Staking period has not ended yet"
+          hardhatLockableStakingRewards
+              .connect(account1)
+              .withdraw(stakeId, 0, true)).to.be.revertedWith(
+          "LockableStakingRewards: Staking period has not ended yet"
       );
     });
 
@@ -649,10 +612,10 @@ describe("LockableStakingRewards", () => {
           hardhatLockableStakingRewards.address
       );
       expect(balanceStakingContract).to.equal(initial);
-      const fee = await hardhatLockableStakingRewards.feeInfo();
+
       await hardhatLockableStakingRewards
-        .connect(account1)
-        .stake(planId, fee.stakeFee, stakingAmount);
+          .connect(account1)
+          .stake(planId, stakingAmount);
 
       const balanceAfterStaking = await hardhatCrowdToken.balanceOf(
           hardhatLockableStakingRewards.address
@@ -672,13 +635,8 @@ describe("LockableStakingRewards", () => {
       );
 
       await hardhatLockableStakingRewards
-        .connect(account1)
-        .withdraw(
-          fee.unstakeFee,
-          0,
-          ethers.utils.parseUnits("5", "ether"),
-          false
-        );
+          .connect(account1)
+          .withdraw(0, ethers.utils.parseUnits("5", "ether"), false);
 
       const user1Stakes =
           await hardhatLockableStakingRewards.userStakes(
@@ -718,11 +676,9 @@ describe("LockableStakingRewards", () => {
         hardhatLockableStakingRewards.address
       );
       expect(balanceStakingContract).to.equal(initial);
-
-      const fee = await hardhatLockableStakingRewards.feeInfo();
       const stakeTx = await hardhatLockableStakingRewards
         .connect(account1)
-        .stake(planId, fee.stakeFee, stakingAmount);
+        .stake(planId, stakingAmount);
       const stakeReceipt= await stakeTx.wait();
       const stakeLog= getLog(stakeReceipt, "Staked");
       const stakeId= stakeLog.stakeId;
@@ -740,7 +696,7 @@ describe("LockableStakingRewards", () => {
 
       await hardhatLockableStakingRewards
         .connect(account1)
-        .withdraw(fee.unstakeFee, stakeId, expectedReward, false);
+        .withdraw(stakeId, expectedReward, false);
 
       const balanceAfterWithdraw = await hardhatCrowdToken.balanceOf(
         hardhatLockableStakingRewards.address
@@ -765,38 +721,28 @@ describe("LockableStakingRewards", () => {
       await hardhatCrowdToken.mint(hardhatLockableStakingRewards.address, stakingAmount.add(expectedReward));
 
       const planId= await createPlan(hardhatLockableStakingRewards);
-      const LOCK_FOR_BLOCS_DURATION =
-        await hardhatLockableStakingRewards.LOCK_FOR_BLOCS_DURATION();
 
       await mintAndApprove(
           hardhatCrowdToken,
           hardhatLockableStakingRewards,
           stakingAmount,
           account1);
-      
-      let fee = await hardhatLockableStakingRewards.feeInfo();
+
       const stakeTx = await hardhatLockableStakingRewards
           .connect(account1)
-          .stake(planId, fee.stakeFee, stakingAmount);
+          .stake(planId, stakingAmount);
       const stakeReceipt= await stakeTx.wait();
       const stakeLog= getLog(stakeReceipt, "Staked");
       const stakeId= stakeLog.stakeId;
 
       await moveTimeForward(30 * 24 * 60 * 60);
-      
 
-      await moveBlockForward(LOCK_FOR_BLOCS_DURATION);
+      const fee=await hardhatLockableStakingRewards.feeInfo();
+      await setFee(hardhatLockableStakingRewards,fee.feeTo,fee.stakeFee,BigNumber.from(0));
 
-      await hardhatLockableStakingRewards.setFee({
-        feeTo: fee.feeTo,
-        stakeFee: fee.stakeFee,
-        unstakeFee: BigNumber.from(0),
-      });
-
-      fee = await hardhatLockableStakingRewards.feeInfo();
       await hardhatLockableStakingRewards
           .connect(account1)
-          .withdraw(fee.unstakeFee, stakeId.toString(), 0, true);
+          .withdraw(stakeId.toString(), 0, true);
 
       const userStakesBefore =
           await hardhatLockableStakingRewards.userStakes(
@@ -807,7 +753,7 @@ describe("LockableStakingRewards", () => {
       await expect(
           hardhatLockableStakingRewards
               .connect(account1)
-              .withdraw(fee.unstakeFee, stakeId.toString(), 0, true)
+              .withdraw(stakeId.toString(), 0, true)
       ).to.be.revertedWith(
           "LockableStakingRewards: The stake has been archived"
       );
@@ -835,22 +781,17 @@ describe("LockableStakingRewards", () => {
 
       const planId= await createPlan(hardhatLockableStakingRewards);
 
-      let fee = await hardhatLockableStakingRewards.feeInfo();
-      await hardhatLockableStakingRewards.setFee({
-        feeTo: fee.feeTo,
-        stakeFee: fee.stakeFee,
-        unstakeFee: BigNumber.from(0),
-      });
+      const fee=await hardhatLockableStakingRewards.feeInfo();
+      await setFee(hardhatLockableStakingRewards,fee.feeTo,fee.stakeFee,BigNumber.from(0));
       await mintAndApprove(
           hardhatCrowdToken,
           hardhatLockableStakingRewards,
           stakingAmount.add(expectedReward),
           account1);
-      
-      fee = await hardhatLockableStakingRewards.feeInfo();
+
       const stakeTx = await hardhatLockableStakingRewards
         .connect(account1)
-        .stake(planId, fee.stakeFee, stakingAmount);
+        .stake(planId, stakingAmount);
       const stakeReceipt= await stakeTx.wait();
       const stakeLog= getLog(stakeReceipt, "Staked");
       const stakeId= stakeLog.stakeId;
@@ -858,9 +799,7 @@ describe("LockableStakingRewards", () => {
       await moveTimeForward(30 * 24 * 60 * 60);
 
       // Call reStake function
-      await hardhatLockableStakingRewards
-        .connect(account1)
-        .extend(fee.stakeFee, fee.unstakeFee, stakeId);
+      await hardhatLockableStakingRewards.connect(account1).extend(stakeId);
 
       // Assertions
       const userStakesBefore =
@@ -896,12 +835,8 @@ describe("LockableStakingRewards", () => {
           .connect(owner)
           .createPlan(duration, apr, defaultApr);
 
-      let fee = await hardhatLockableStakingRewards.feeInfo();
-      await hardhatLockableStakingRewards.setFee({
-        feeTo: fee.feeTo,
-        stakeFee: fee.stakeFee,
-        unstakeFee: BigNumber.from(0),
-      });
+      const fee = await hardhatLockableStakingRewards.feeInfo();
+      await setFee(hardhatLockableStakingRewards,fee.feeTo,fee.stakeFee,BigNumber.from(0));
 
       //expected reward for 30 days (plan duration)
       const expectedReward: BigNumber = stakingAmount
@@ -919,11 +854,10 @@ describe("LockableStakingRewards", () => {
           hardhatLockableStakingRewards,
           stakingAmount.add(expectedReward.add(expectedRewardBasedOnDefaultApr)),
           account1);
-      
-       fee = await hardhatLockableStakingRewards.feeInfo();
+
        await hardhatLockableStakingRewards
-         .connect(account1)
-         .stake(0, fee.stakeFee, stakingAmount);
+          .connect(account1)
+          .stake(0, stakingAmount);
 
       //moved 30 days
       await moveTimeForward(30 * 24 * 60 * 60);
@@ -939,9 +873,7 @@ describe("LockableStakingRewards", () => {
           expectedReward.add(expectedRewardBasedOnDefaultApr)
       );
       // Call reStake function
-      await hardhatLockableStakingRewards
-        .connect(account1)
-        .extend(fee.stakeFee, fee.unstakeFee, 0);
+      await hardhatLockableStakingRewards.connect(account1).extend(0);
 
       // Assertions
       const userStakesBefore =
@@ -960,68 +892,21 @@ describe("LockableStakingRewards", () => {
     });
 
     it("extend without stake", async function () {
+
       const {
         lockableStakingRewards: hardhatLockableStakingRewards,
         CROWD: hardhatCrowdToken,
       } = await loadFixture(lockableStakingRewardsFixture);
 
-      const fee = await hardhatLockableStakingRewards.feeInfo();
-
       // Call reStake function
       await expect(
-        hardhatLockableStakingRewards
-          .connect(owner)
-          .extend(fee.stakeFee, fee.unstakeFee, 0)
-      ).to.be.revertedWith("LockableStakingRewards: Invalid stake ID");
+          hardhatLockableStakingRewards.connect(owner).extend(0)
+      ).to.be.revertedWith(
+          "LockableStakingRewards: Invalid stake ID"
+      );
     });
 
   });
-
-  describe("lock critical operations", () => {
-    it("setFeeInfo should fail if n blocks after stake is not passed", async function () {
-      const { lockableStakingRewards, CROWD: crowdToken } = await loadFixture(
-        lockableStakingRewardsFixture
-      );
-
-      const apr = ethers.BigNumber.from(3000); // 30%
-      const duration = ethers.BigNumber.from(30 * 24 * 60 * 60);
-      const stakingAmount = ethers.utils.parseUnits("10", "ether");
-
-      const expectedReward = stakingAmount
-        .mul(apr)
-        .mul(duration)
-        .div(360 * 24 * 60 * 60 * 10000);
-
-      await crowdToken.mint(
-        lockableStakingRewards.address,
-        stakingAmount.add(expectedReward)
-      );
-
-      const planId = await createPlan(lockableStakingRewards);
-
-      await mintAndApprove(
-        crowdToken,
-        lockableStakingRewards,
-        stakingAmount,
-        account1
-      );
-
-      const fee = await lockableStakingRewards.feeInfo();
-
-      const stakeTx = await lockableStakingRewards
-        .connect(account1)
-        .stake(planId, fee.stakeFee, stakingAmount);
-
-      await expect(
-        lockableStakingRewards.setFee({
-          feeTo: fee.feeTo,
-          stakeFee: fee.stakeFee,
-          unstakeFee: ethers.BigNumber.from(0),
-        })
-      ).to.be.revertedWith("BlockBasedLock: locked");
-    });
-  });
-  
 
   describe("UserDetails", () => {
     it("should return staking records for a user", async function () {
@@ -1049,14 +934,13 @@ describe("LockableStakingRewards", () => {
         amountToStake,
         account1
       );
-      
-      const fee = await hardhatLockableStakingRewards.feeInfo();
+
       await hardhatLockableStakingRewards
         .connect(account1)
-        .stake(planId1, fee.stakeFee, ethers.utils.parseEther("100"));
+        .stake(planId1, ethers.utils.parseEther("100"));
       await hardhatLockableStakingRewards
         .connect(account1)
-        .stake(planId2, fee.stakeFee, ethers.utils.parseEther("200"));
+        .stake(planId2, ethers.utils.parseEther("200"));
 
       const user1Stakes = await hardhatLockableStakingRewards.userStakes(
         account1.address,
@@ -1103,15 +987,13 @@ describe("LockableStakingRewards", () => {
           hardhatLockableStakingRewards,
           amountToStake,
           account1);
-      
-      const fee = await hardhatLockableStakingRewards.feeInfo();
 
       await hardhatLockableStakingRewards
         .connect(account1)
-        .stake(planId1, fee.stakeFee, ethers.utils.parseEther("100"));
+        .stake(planId1, ethers.utils.parseEther("100"));
       await hardhatLockableStakingRewards
         .connect(account1)
-        .stake(planId2, fee.stakeFee, ethers.utils.parseEther("200"));
+        .stake(planId2, ethers.utils.parseEther("200"));
 
       const user1TotalStakedAmount =
         await hardhatLockableStakingRewards.getUserTotalStakedAmount(
@@ -1129,17 +1011,6 @@ describe("LockableStakingRewards", () => {
     await ethers.provider.send("evm_mine", [
       (current ?? currentTimestamp.timestamp) + seconds,
     ]);
-  }
-  
-  /**
-   * 
-   * @param numberOfBlocksToAdvance Number of blocks to advance
-   */
-  async function moveBlockForward(numberOfBlocksToAdvance: number) {
-    // Advance the block
-    for (let i = 0; i < numberOfBlocksToAdvance; i++) {
-      await ethers.provider.send("evm_mine", []);
-    }
   }
 
  function getLog(txReceipt:ContractReceipt, eventName:string):Result {
@@ -1183,5 +1054,15 @@ describe("LockableStakingRewards", () => {
       await token.mint(user.address ?? user, amount);
       await token.connect(user).approve(contract.address, amount);
    // }
+  }
+
+  async function setFee(hardhatLockableStakingRewards:LockableStakingRewards,feeTo:string,stakeFee:BigNumber,unstakeFee:BigNumber) {
+    await hardhatLockableStakingRewards.pause();
+    await hardhatLockableStakingRewards.setFee({
+      feeTo: feeTo,
+      stakeFee: stakeFee,
+      unstakeFee: unstakeFee,
+    });
+    await hardhatLockableStakingRewards.unpause();
   }
 });
