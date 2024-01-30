@@ -361,7 +361,6 @@ contract LockableStakingRewards is
     )
         external
         nonReentrant
-        whenNotPaused
         validStakeId(_stakeId)
         validUser(msg.sender)
     {
